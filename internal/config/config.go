@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"math"
 	"net/url"
 	"os"
@@ -645,6 +646,23 @@ func (c *Config) Use(service, name string) error {
 		return fmt.Errorf("--provider %s: expected one of %s", name, strings.Join(p.Names, " | "))
 	}
 	c.resolve(service, name)
+	return nil
+}
+
+// UseStyle makes name the style of service's active provider (tts or live) for this run (--style); "" applies no
+// style, as in config.toml, which is not written.
+func (c *Config) UseStyle(service, name string) error {
+	if _, ok := c.Styles[name]; !ok && name != "" {
+		names := strings.Join(slices.Sorted(maps.Keys(c.Styles)), " | ")
+		return fmt.Errorf("--style %s: expected one of %s, or \"\" for no style", name, names)
+	}
+	instructions := strings.TrimSpace(c.Styles[name].Instructions)
+	switch service {
+	case "tts":
+		c.TTS.Style, c.TTS.Instructions = name, instructions
+	case "live":
+		c.Live.Style, c.Live.Instructions = name, instructions
+	}
 	return nil
 }
 

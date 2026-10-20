@@ -181,6 +181,8 @@ Each `[styles.<name>]` has a nonempty `instructions` (may span lines) and is sha
 A provider's `style` absent or `""` means no style, including when a style named `default` is defined. A selected
 name must exist. No `instructions_mode` means no instructions are applied; a selected inactive style produces a
 warning. Merely defining an unselected style does not produce a warning in the current implementation.
+`habla say` and `habla live` take `--style NAME` to use another style for one run without writing the file;
+`--style ""` means no style, as `style = ""` does.
 
 | `tts` provider `instructions_mode` | Protocol | Delivery |
 | --- | --- | --- |

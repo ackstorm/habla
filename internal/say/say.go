@@ -38,6 +38,8 @@ func Main(args []string) int {
 	stop := fs.Bool("stop", false, "stop the speech in progress")
 	out := fs.String("out", "", "write the audio to `FILE` instead of playing it")
 	provider := fs.String("provider", "", "use the tts provider `NAME` for this run")
+	var style *string // set only when --style is given: "" means no style
+	fs.Func("style", "use the [styles.*] `NAME` for this run (\"\": no style)", func(s string) error { style = &s; return nil })
 	logLevel := fs.String("log", "", "log at `LEVEL` (error, warn, info, debug) for this run")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -87,6 +89,12 @@ func Main(args []string) int {
 	}
 	if *provider != "" {
 		if err := cfg.Use("tts", *provider); err != nil {
+			fmt.Fprintln(os.Stderr, "habla say:", err)
+			return 1
+		}
+	}
+	if style != nil {
+		if err := cfg.UseStyle("tts", *style); err != nil {
 			fmt.Fprintln(os.Stderr, "habla say:", err)
 			return 1
 		}

@@ -465,6 +465,24 @@ func TestProviders(t *testing.T) {
 	}
 }
 
+func TestUseStyleOverridesTheProvidersStyle(t *testing.T) {
+	setup(t)
+	write(t, Path(), DefaultTOML)
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.UseStyle("tts", "sevilla"); err != nil || c.TTS.Style != "sevilla" || c.TTS.Instructions != strings.TrimSpace(c.Styles["sevilla"].Instructions) {
+		t.Fatalf("sevilla: %v %+v", err, c.TTS)
+	}
+	if err := c.UseStyle("live", ""); err != nil || c.Live.Style != "" || c.Live.Instructions != "" {
+		t.Fatalf("no style: %v %+v", err, c.Live)
+	}
+	if err := c.UseStyle("tts", "nope"); err == nil || !strings.Contains(err.Error(), "| storyteller, or") {
+		t.Fatalf("unknown style: %v", err)
+	}
+}
+
 func TestActiveProvider(t *testing.T) {
 	one := "[stt.providers.solo]\nendpoint = \"https://a/v1\"\napi_key = \"env:A\"\nmodel = \"m\"\n"
 	if c, err := parse(one); err != nil || c.Providers["stt"].Active != "solo" || c.STT.Model != "m" {

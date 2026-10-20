@@ -30,6 +30,8 @@ func Main(args []string) (code int) {
 	noOutput := fs.Bool("no-output", false, "do not save a transcript (terminal output remains enabled)")
 	outputFile := fs.String("output-file", "", "save the transcript to `FILE` instead of the default timestamped file")
 	provider := fs.String("provider", "", "use the live provider `NAME` for this run")
+	var styleFlag *string // set only when --style is given: "" means no style
+	fs.Func("style", "use the [styles.*] `NAME` for this run (\"\": no style)", func(s string) error { styleFlag = &s; return nil })
 	logLevel := fs.String("log", "", "log at `LEVEL` for this run")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -38,7 +40,7 @@ func Main(args []string) (code int) {
 		return 2
 	}
 	if fs.NArg() != 0 || (*noOutput && *outputFile != "") {
-		fmt.Fprintln(os.Stderr, "usage: habla live [--context FILE] [--no-output | --output-file FILE] [--provider NAME] [--log LEVEL]")
+		fmt.Fprintln(os.Stderr, "usage: habla live [--context FILE] [--no-output | --output-file FILE] [--provider NAME] [--style NAME] [--log LEVEL]")
 		return 2
 	}
 	if err := logs.Setup("live", *logLevel); err != nil {
@@ -62,6 +64,12 @@ func Main(args []string) (code int) {
 	}
 	if *provider != "" {
 		if err := cfg.Use("live", *provider); err != nil {
+			fmt.Fprintln(os.Stderr, "habla live:", err)
+			return 1
+		}
+	}
+	if styleFlag != nil {
+		if err := cfg.UseStyle("live", *styleFlag); err != nil {
 			fmt.Fprintln(os.Stderr, "habla live:", err)
 			return 1
 		}

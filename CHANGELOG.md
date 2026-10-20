@@ -7,6 +7,8 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ### Added
 
+- `habla say --style NAME` and `habla live --style NAME` pick a `[styles.*]` for one run; `--style ""` turns
+  the provider's style off.
 - The recording pill times transcription and transform: *Transcribing (0.8s)*, *Refining text (1.4s)*; the recording
   time stays beside them.
 

@@ -65,7 +65,7 @@ shortcuts on KDE/GNOME Wayland are managed by the desktop.
 
 - Text is ONE argument (a second one is rejected, exit 2), or stdin when there is none. Quote it.
 - It blocks until the audio is fetched and played (`pw-play`, else `paplay`). Only one speech at a time: a second call exits 1 ("Already speaking").
-- `habla say --stop` cuts the speech (exit 0; exit 1 if nothing is playing). `--out FILE` writes the audio instead of playing; `--provider NAME` picks a tts provider for one run.
+- `habla say --stop` cuts the speech (exit 0; exit 1 if nothing is playing). `--out FILE` writes the audio instead of playing; `--provider NAME` picks a tts provider for one run, `--style NAME` a style (`--style ""`: none).
 - Failures (no `[tts.providers.<name>]`: "TTS is not configured", no player, bad credential) exit 1 and are reported as desktop notifications, not on stderr.
 
 Rules:

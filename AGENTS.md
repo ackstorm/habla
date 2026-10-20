@@ -37,7 +37,7 @@ Push-to-dictate for the Linux desktop through OpenAI-compatible, Gemini or Eleve
   `init` locks the main OS thread for GTK. Icons are extracted to `$XDG_RUNTIME_DIR/habla/icons/hicolor/...`.
 - `internal/config`: `Load()` = `[general]` / `[tray]` (hotkey, paste, paste_enter: tray only; `habla listen` uses
   `--paste`/`--paste_enter` → `Config.Paste`/`PasteEnter`) / `[split]` defaults ← config.toml decoded as `file` (per-service `providers`, `stt.transforms`, top-level `styles`), each service's
-  active provider resolved into `STT`/`LLM`/`TTS`/`Live` (`Use` for `--provider`); `SaveChoice` writes
+  active provider resolved into `STT`/`LLM`/`TTS`/`Live` (`Use` for `--provider`, `UseStyle` for `say`/`live --style`, `""` = none); `SaveChoice` writes
   into the active provider (one key line in place, re-parsed before the atomic rename) and `setKey`/`lineOf` skip multi-line strings;
   `Conn`, `TransformModel`, and strict unknown-key errors. An invalid file returns nil + the error: listen, say and tray
   startup exit 1 through `desktop.ConfigError`; the running tray's `refresh` keeps its last valid config.

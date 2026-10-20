@@ -67,7 +67,8 @@ The installer warns about what is missing (Debian/Ubuntu package names):
     habla --version
 
 `habla listen` also takes `--start`, `--stop`, `--toggle`, `--cancel`, `--retry` and `--status`, for key bindings.
-`listen`, `say` and `live` take `--provider NAME` to use another configured provider for one run.
+`listen`, `say` and `live` take `--provider NAME` to use another configured provider for one run; `say` and `live`
+also take `--style NAME` (a `[styles.*]` name, or `""` for none) to override the provider's style for one run.
 
 ## Configuration
 
@@ -240,6 +241,7 @@ otherwise; on Wayland always `Ctrl+V`. Set `ctrl+v` or `ctrl+shift+v` to force o
     habla say "Hello, how are you?"       # speak it (pw-play, else paplay)
     echo "Good morning" | habla say       # text from stdin
     habla say --out greeting.wav "Hello" # write the audio instead of playing it
+    habla say --style sevilla "Hola"      # another [styles.*] for this run ("": none)
     habla say --stop                      # stop what is playing
 
 `habla say` uses the active `[tts.providers.<name>]` for its model, base voice and format. To change the delivery,
