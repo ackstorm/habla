@@ -69,7 +69,9 @@ Push-to-dictate for the Linux desktop through OpenAI-compatible, Gemini or Eleve
   Ignores it (interactive, `--retry`). A session releases `listen.pid` before copying and never touches `current.wav`
   or part files after that (a new session may own them). Tests that hold the fake gateway (`Replies.HoldSTT/HoldChat`)
   register `release` after `setup`: the server's `Close` waits for held requests, and cleanups run last-in first-out.
-- The tray grabs Esc on X11 only while the state is `busy` or `transform` (`grabEscape`); `Hold.Feed` maps an unheld Esc to cancel.
+- The tray grabs Esc and Enter on X11 only while the state is `busy` or `transform` (`grabBusyKeys`); `Hold.Feed` maps an
+  unheld Esc to cancel and an unheld Enter to send (`habla listen --send` → `rundir.SendMark`, read and removed by `deliver`:
+  paste + Enter; a new session removes a stale one). `Event.State` tells a plain Enter from a `<Super>Return` hotkey.
 
 - Tray hotkey auto-repeat: xgb hands events over one at a time, so a repeat's release+press pair is not always queued
   together; after a release the loop waits `autoRepeatGap` (20 ms) for the press. Xvfb auto-repeats XTEST keys, and

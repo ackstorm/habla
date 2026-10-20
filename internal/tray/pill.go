@@ -24,6 +24,8 @@ const (
 	pillHeight = 54 // 46 px body and 4 px shadow space on each side
 	meterWidth = 115
 	pillTextX  = 51 + meterWidth + 21
+	keysWidth  = 100 // the Esc (and Enter) section at the right end: as wide in every phase, so nothing moves
+	willSend   = "Will paste and send"
 )
 
 // recordingView follows a dictation through recording, processing and clipboard delivery.
@@ -41,6 +43,7 @@ type pill struct {
 	lastFrame             time.Time
 	elapsed               string
 	since, until          time.Time // the processing phase's start (StateWritten) and, once delivery begins, its end
+	queued                bool      // Enter was pressed while busy (rundir.SendMark): kept through delivery
 	width                 int32
 	ticker                uint32 // the frame timeout while shown; 0 when hidden
 }
@@ -91,7 +94,7 @@ func (p *pill) show(phase string, hint []Segment) {
 	}
 	p.phase, p.hint = phase, hint
 	if phase == "recording" {
-		p.levels = nil // a new recording never inherits the previous one's peaks
+		p.levels, p.queued = nil, false // a new recording never inherits the previous one's peaks
 	} else if p.elapsed == "" {
 		p.elapsed = "--:--" // the tray may have started after recording ended
 	}
@@ -136,7 +139,11 @@ func (p *pill) frame() bool {
 			p.until = written
 		}
 	}
-	w := int32(583)
+	if rundir.Processing(p.phase) && !p.queued {
+		_, err := os.Stat(rundir.SendMark())
+		p.queued = err == nil
+	}
+	w := int32(604) // even: centred to the pixel
 	for _, phase := range []string{"recording", "busy", "transform", "copy_failed"} {
 		q := *p
 		q.phase = phase
@@ -146,9 +153,10 @@ func (p *pill) frame() bool {
 			title += " (00.0s)" // the phase timer, drawn after the title
 		}
 		textWidth := max(pillText(p.measure, false, title, 0, 0, 13, "sans-serif", true),
-			pillText(p.measure, false, subtitle, 0, 0, 11, "sans-serif", false))
+			pillText(p.measure, false, subtitle, 0, 0, 11, "sans-serif", false),
+			pillText(p.measure, false, willSend, 0, 0, 11, "sans-serif", false))
 		timerWidth := pillText(p.measure, false, p.elapsed, 0, 0, 11, "monospace", false)
-		w = max(w, int32(math.Ceil(pillTextX+textWidth+10+max(35, timerWidth)+90)))
+		w = max(w, int32(math.Ceil(pillTextX+textWidth+10+max(35, timerWidth)+keysWidth+10)))
 	}
 	w = max(w, p.width)
 	if w != p.width {
@@ -240,6 +248,9 @@ func (p *pill) labels() (title, subtitle, cancel string) {
 		title, subtitle = "Refining text", "Corrections and style"
 	case "copy_failed":
 		title, subtitle = "Copy failed", "See notification"
+	}
+	if p.queued && rundir.Processing(p.phase) {
+		subtitle = willSend
 	}
 	for _, segment := range p.hint {
 		if segment.Key && segment.Text == "Esc" {
@@ -347,7 +358,7 @@ func (p *pill) draw(cr uintptr) {
 	}
 
 	gtk.CairoSetSourceRGBA(cr, 181/255.0, 196/255.0, 211/255.0, 0.25)
-	for _, x := range []float64{pillTextX - 11, w - 80} {
+	for _, x := range []float64{pillTextX - 11, w - keysWidth} {
 		gtk.CairoRectangle(cr, x, middle-13, 1, 26)
 		gtk.CairoFill(cr)
 	}
@@ -360,18 +371,62 @@ func (p *pill) draw(cr uintptr) {
 	}
 	pillText(cr, true, subtitle, pillTextX, middle+12, 11, "sans-serif", false)
 	timerWidth := pillText(cr, false, p.elapsed, 0, 0, 11, "monospace", false)
-	pillText(cr, true, p.elapsed, w-90-timerWidth, middle+4, 11, "monospace", false)
+	pillText(cr, true, p.elapsed, w-keysWidth-10-timerWidth, middle+4, 11, "monospace", false)
 	if cancel != "" {
-		keyWidth := pillText(cr, false, cancel, 0, 0, 10, "monospace", false)
-		center := w - 43
-		gtk.CairoSetSourceRGBA(cr, 181/255.0, 196/255.0, 211/255.0, 0.65)
-		roundRect(cr, center-keyWidth/2-5, middle-15, keyWidth+10, 18, 4)
-		gtk.CairoSetSourceRGBA(cr, 248/255.0, 250/255.0, 252/255.0, 1)
-		roundRect(cr, center-keyWidth/2-4, middle-14, keyWidth+8, 16, 3)
+		center, caption := w-keysWidth/2-3, "to cancel"
+		escWidth := pillText(cr, false, cancel, 0, 0, 10, "monospace", false) + 8
+		if cancel != "ESC" || !rundir.Processing(p.phase) { // Enter sends only while busy, with the X11 hotkey
+			keycap(cr, center-escWidth/2, escWidth, middle, cancel, false)
+		} else {
+			slashWidth := pillText(cr, false, " / ", 0, 0, 10, "sans-serif", false)
+			x := center - (escWidth+slashWidth+8+16)/2
+			keycap(cr, x, escWidth, middle, cancel, false)
+			pillText(cr, true, " / ", x+escWidth+4, middle-3, 10, "sans-serif", false)
+			keycap(cr, x+escWidth+slashWidth+8, 16, middle, "", p.queued)
+			caption = "cancel / send"
+			if p.queued {
+				caption = "cancel / queued"
+			}
+		}
 		gtk.CairoSetSourceRGBA(cr, 82/255.0, 97/255.0, 119/255.0, 1)
-		pillText(cr, true, cancel, center-keyWidth/2, middle-3, 10, "monospace", false)
-		captionWidth := pillText(cr, false, "to cancel", 0, 0, 9, "sans-serif", false)
-		pillText(cr, true, "to cancel", center-captionWidth/2, middle+14, 9, "sans-serif", false)
+		captionWidth := pillText(cr, false, caption, 0, 0, 9, "sans-serif", false)
+		pillText(cr, true, caption, center-captionWidth/2, middle+14, 9, "sans-serif", false)
+	}
+}
+
+// keycap draws a key width wide from x on the key row: label, or (label "") Enter's ↵, or a queued ✓ in aqua. The
+// arrow and the tick are filled shapes: cairo's toy text API has no glyph fallback for them.
+func keycap(cr uintptr, x, width, middle float64, label string, queued bool) {
+	border, alpha, face, ink := [3]float64{181, 196, 211}, 0.65, [3]float64{248, 250, 252}, [3]float64{82, 97, 119}
+	if queued {
+		border, alpha, face, ink = [3]float64{139, 221, 219}, 1, [3]float64{229, 247, 246}, [3]float64{22, 120, 117}
+	}
+	gtk.CairoSetSourceRGBA(cr, border[0]/255, border[1]/255, border[2]/255, alpha)
+	roundRect(cr, x-1, middle-15, width+2, 18, 4)
+	gtk.CairoSetSourceRGBA(cr, face[0]/255, face[1]/255, face[2]/255, 1)
+	roundRect(cr, x, middle-14, width, 16, 3)
+	gtk.CairoSetSourceRGBA(cr, ink[0]/255, ink[1]/255, ink[2]/255, 1)
+	cx, cy := x+width/2, middle-6
+	switch {
+	case label != "":
+		pillText(cr, true, label, x+4, middle-3, 10, "monospace", false)
+	case queued: // ✓
+		for i, pt := range [][2]float64{{-4, -0.2}, {-1.3, 2.5}, {3.8, -3.2}, {4.8, -2.2}, {-1.3, 4.3}, {-5, 0.8}} {
+			if i == 0 {
+				gtk.CairoMoveTo(cr, cx+pt[0], cy+pt[1])
+			} else {
+				gtk.CairoLineTo(cr, cx+pt[0], cy+pt[1])
+			}
+		}
+		gtk.CairoFill(cr)
+	default: // ↵
+		gtk.CairoRectangle(cr, cx+2.4, cy-3.6, 1.2, 4.3)
+		gtk.CairoRectangle(cr, cx-2.4, cy-0.5, 6, 1.2)
+		gtk.CairoFill(cr)
+		gtk.CairoMoveTo(cr, cx-4.6, cy+0.1)
+		gtk.CairoLineTo(cr, cx-1.8, cy-2.5)
+		gtk.CairoLineTo(cr, cx-1.8, cy+2.7)
+		gtk.CairoFill(cr)
 	}
 }
 

@@ -146,6 +146,15 @@ func TestEscWhenNotHeldCancels(t *testing.T) { // the tray grabs Esc only while 
 	active(t, h, false)
 }
 
+func TestEnterWhenNotHeldSendsEvenWhenItIsTheHotkeysKey(t *testing.T) { // the tray grabs Enter only while busy
+	const enter = 36
+	h := NewHold(enter, esc).WithEnter(enter, Mod4) // <Super>Return
+	feed(t, h, []string{"send"}, press(enter, 1), release(enter, 2))
+	withSuper := Event{Press: true, Keycode: enter, State: Mod4 | Mod2, Time: 3} // NumLock on
+	feed(t, h, []string{"start"}, withSuper)
+	feed(t, h, []string{"stop"}, release(enter, 4)) // Super released first
+}
+
 func TestOtherKeysWhileHeldAreIgnored(t *testing.T) {
 	h := NewHold(space, esc)
 	feed(t, h, []string{"start"}, press(space, 1))

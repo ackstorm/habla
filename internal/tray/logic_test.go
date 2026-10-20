@@ -556,6 +556,12 @@ func TestPillLabels(t *testing.T) {
 			t.Errorf("%s/%s/%t: got %q / %q / %q", tt.phase, tt.hotkey, tt.held, title, subtitle, cancel)
 		}
 	}
+	for _, phase := range []string{"busy", "transform"} {
+		p := pill{phase: phase, queued: true}
+		if _, subtitle, _ := p.labels(); subtitle != willSend {
+			t.Errorf("%s after Enter: %q", phase, subtitle)
+		}
+	}
 }
 
 func TestEnqueueListenPutsPasteFlagsBeforeTheMode(t *testing.T) {

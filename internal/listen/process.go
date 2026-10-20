@@ -209,6 +209,9 @@ func (d *dictation) removeParts() {
 
 // deliver prints text, copies it and pastes it (when cfg.Paste, then Enter with cfg.PasteEnter), then says so. start is the release.
 func deliver(cfg *config.Config, text, detail string, transformErr error, desktopNotify bool, start time.Time) int {
+	if os.Remove(rundir.SendMark()) == nil { // Enter while busy (--send)
+		cfg.Paste, cfg.PasteEnter = true, true
+	}
 	if text == "" {
 		rundir.Delivery("")
 		desktop.Notify("Nothing heard.", "", desktopNotify)

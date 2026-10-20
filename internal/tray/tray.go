@@ -133,7 +133,7 @@ type tray struct {
 	key             string // the X11 hotkey's label; "" for the portal (the user picks the key) or none
 	held            bool   // the last hold-to-talk action was --start: the recording ends on release
 	hotkey          *x11Hotkey
-	escGrabbed      bool          // Esc is grabbed during transcription or transform
+	busyGrabbed     bool          // Esc and Enter are grabbed during transcription or transform
 	pill            recordingView // nil: the tray icon alone
 	pillState       string
 	pillPhase       string // the phase and hint the pill shows
@@ -222,9 +222,9 @@ func (t *tray) refresh() {
 		icon = "failed"
 	}
 	gtk.IndicatorSetIconFull(t.indicator, "habla-"+icon+"-symbolic", descriptions[state])
-	if busy := rundir.Processing(state); t.hotkey != nil && busy != t.escGrabbed {
-		t.hotkey.grabEscape(busy)
-		t.escGrabbed = busy
+	if busy := rundir.Processing(state); t.hotkey != nil && busy != t.busyGrabbed {
+		t.hotkey.grabBusyKeys(busy)
+		t.busyGrabbed = busy
 	}
 	if state == "recording" && t.timer == 0 {
 		t.timer = gtk.Timeout(1000, t.tick)

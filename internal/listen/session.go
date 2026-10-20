@@ -54,6 +54,7 @@ func runSession(keys, ready *os.File, paste bool) int {
 	d := &dictation{cfg: cfg, desktopNotify: desktopNotify, signals: signals, more: more}
 	current := filepath.Join(rundir.Dir(), "current.wav")
 	os.Remove(current) // a file left by a killed session must not be read as this recording
+	os.Remove(rundir.SendMark())
 	for {
 		if code, ok := d.record(current, keys, ready); !ok {
 			return code

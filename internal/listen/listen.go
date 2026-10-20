@@ -33,6 +33,7 @@ func Main(args []string) int {
 	toggle := fs.Bool("toggle", false, "start, or stop if one is running")
 	cancel := fs.Bool("cancel", false, "discard the recording in progress (while busy: the whole dictation)")
 	retry := fs.Bool("retry", false, "rerun the pipeline on failed.wav")
+	send := fs.Bool("send", false, "while busy: paste the dictation and press Enter when it is ready")
 	status := fs.Bool("status", false, "print idle, recording, busy, transform, copying, pasting, copy_failed or failed")
 	session := fs.Bool("session", false, "internal: the background recording that --start runs")
 	providerFlag := fs.String("provider", "", "use the stt provider `NAME` for this run")
@@ -49,13 +50,13 @@ func Main(args []string) int {
 		return 2
 	}
 	modes := 0
-	for _, mode := range []*bool{start, stop, toggle, cancel, retry, status, session} {
+	for _, mode := range []*bool{start, stop, toggle, cancel, retry, send, status, session} {
 		if *mode {
 			modes++
 		}
 	}
 	if modes > 1 || fs.NArg() > 0 {
-		fmt.Fprintln(os.Stderr, "habla listen: use one of --start, --stop, --toggle, --cancel, --retry, --status")
+		fmt.Fprintln(os.Stderr, "habla listen: use one of --start, --stop, --toggle, --cancel, --retry, --send, --status")
 		return 2
 	}
 	switch {
@@ -68,6 +69,8 @@ func Main(args []string) int {
 		return signalRecording(syscall.SIGTERM)
 	case *retry:
 		return retryFailed(*paste)
+	case *send:
+		return markSend()
 	case *toggle:
 		switch {
 		case rundir.RunningPID(rundir.Listen) == 0:
@@ -190,6 +193,20 @@ func signalRecording(sig syscall.Signal) int {
 	return 0
 }
 
+// markSend is --send (the tray's Enter while busy). ponytail: a mark that lands after deliver has looked is unused;
+// the next session removes it.
+func markSend() int {
+	if rundir.RunningPID(rundir.Listen) == 0 || !rundir.Processing(rundir.ReadState()) {
+		fmt.Fprintln(os.Stderr, "Not busy")
+		return 1
+	}
+	if err := os.WriteFile(rundir.SendMark(), nil, 0o600); err != nil {
+		fmt.Fprintln(os.Stderr, "habla listen:", err)
+		return 1
+	}
+	return 0
+}
+
 func retryFailed(paste bool) int {
 	signal.Ignore(syscall.SIGUSR2) // busy invites another part; a retry has none (--cancel ends it, failed.wav kept)
 	cfg, err := loadConfig(true, paste)
@@ -202,6 +219,7 @@ func retryFailed(paste bool) int {
 		return 1
 	}
 	defer rundir.Release(rundir.Listen)
+	os.Remove(rundir.SendMark()) // a mark left by an earlier dictation
 	failed := filepath.Join(rundir.Dir(), "failed.wav")
 	if _, err := os.Stat(failed); err != nil {
 		fmt.Fprintln(os.Stderr, "Nothing to retry")

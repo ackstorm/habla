@@ -884,6 +884,28 @@ func TestCancelWhileBusyInTheBackground(t *testing.T) {
 	}
 }
 
+func TestSendWhileBusyPastesAndPressesEnter(t *testing.T) {
+	r := testenv.DefaultReplies
+	gate := make(chan struct{})
+	r.HoldSTT = gate
+	e, _, _ := setup(t, r, conf)
+	open := release(t, gate)
+	if code := Main([]string{"--send"}); code != 1 { // idle: nothing to send
+		t.Fatal(code)
+	}
+	backgroundPart(t, e, 1, "--start", "--stop") // no --paste
+	pid := rundir.RunningPID(rundir.Listen)
+	testenv.WaitFor(t, "busy", func() bool { return rundir.ReadState() == "busy" })
+	if code := Main([]string{"--send"}); code != 0 {
+		t.Fatal(code)
+	}
+	open()
+	testenv.WaitFor(t, "the session to exit", func() bool { return !rundir.Alive(pid) })
+	want(t, e.Lines("copied"), "Hola.")
+	want(t, e.Lines("pasted"), "wtype -M ctrl v -m ctrl", "wtype -k Return")
+	emptyRunDir(t)
+}
+
 func TestDictationIsRecordedInStatsWithoutText(t *testing.T) {
 	r := testenv.DefaultReplies
 	r.Cost = "0.001"

@@ -66,7 +66,7 @@ The installer warns about what is missing (Debian/Ubuntu package names):
     habla stats               # cost and latency
     habla --version
 
-`habla listen` also takes `--start`, `--stop`, `--toggle`, `--cancel`, `--retry` and `--status`, for key bindings.
+`habla listen` also takes `--start`, `--stop`, `--toggle`, `--cancel`, `--retry`, `--send` and `--status`, for key bindings.
 `listen`, `say` and `live` take `--provider NAME` to use another configured provider for one run; `say` and `live`
 also take `--style NAME` (a `[styles.*]` name, or `""` for none) to override the provider's style for one run.
 
@@ -156,7 +156,9 @@ settles to a one-pixel line; this threshold affects only the display. Bar height
 colours indicate speech intensity: amber from -20 dBFS and red from -12 dBFS. Red does not mean the audio is clipping.
 The recording duration sits at the right, before the cancellation
 hint, and freezes when recording ends. **Transcribing** uses aqua activity and a rotating spinner; **Refining text**
-uses gold activity and a shimmering star. Both activity bars bounce every 0.65 seconds. Escape remains visible in every phase where it can cancel; recording
+uses gold activity and a shimmering star. Both activity bars bounce every 0.65 seconds. Escape remains visible in every phase where it can cancel,
+beside Enter (*cancel / send*) while transcribing or refining; after Enter the key shows a tick (*cancel / queued*) and
+the subtitle *Will paste and send*; recording
 started from the tray or through a Wayland shortcut keeps the tray instructions. Clicks pass through the bar and it
 never takes focus. The last phase stays visible until copying and pasting finish. A copy failure leaves an error
 bar until the next dictation; the notification keeps the text. On Wayland the bar needs layer-shell (KDE Plasma,
@@ -174,7 +176,8 @@ Hold the hotkey to record, release to transcribe. Default `Super+Space` (`hotkey
 
 Press again while Habla is still transcribing or transforming (amber icon) to continue the same dictation: it drops a
 running transform, waits for the last part, transforms the joined text once and copies it. Esc while transcribing or
-transforming discards the whole dictation (X11; elsewhere `habla listen --cancel`).
+transforming discards the whole dictation (X11; elsewhere `habla listen --cancel`), and Enter pastes it and presses
+Enter once it is ready, whatever the paste setting (X11; elsewhere `habla listen --send`).
 
 Dictation splits automatically by default (`[split] enabled = true`, `after = 10`, `pause = 1`). Audio uploads
 while you speak; a one-second pause ends a segment once it has lasted at least ten seconds. The timer restarts

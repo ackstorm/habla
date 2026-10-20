@@ -198,6 +198,31 @@ func TestTrayHoldToTalkGUI(t *testing.T) {
 	}
 }
 
+func TestTrayEnterWhileBusySendsGUI(t *testing.T) {
+	e, _ := guiEnv(t, "")
+	r := testenv.DefaultReplies
+	r.HoldSTT = make(chan struct{})
+	g := testenv.NewGateway(t, r)
+	e.WriteConfig(t, g, "[tray]\nhotkey = \"<Super>Return\"\n")
+	defer close(r.HoldSTT)
+	log, _ := startTray(t, e, true)
+	waitLog(t, log, "No tray to show Habla's icon")
+
+	xdo(t, "keydown", "super+Return")
+	testenv.WaitFor(t, "recording", recording)
+	xdo(t, "keyup", "super+Return")
+	testenv.WaitFor(t, "transcribing", func() bool { return rundir.ReadState() == "busy" })
+	mark := filepath.Join(rundir.Dir(), "send")
+	testenv.WaitFor(t, "Enter while busy to leave the send mark", func() bool {
+		xdo(t, "key", "Return") // the grab follows the busy state through the tray's file watch
+		_, err := os.Stat(mark)
+		return err == nil
+	})
+	if data, _ := os.ReadFile(log); t.Failed() {
+		t.Logf("tray output:\n%s", data)
+	}
+}
+
 func TestTrayHotkeyProblemsGUI(t *testing.T) {
 	for name, tc := range map[string]struct{ hotkey, want string }{
 		"unknown key": {"<Super>nokey", "Invalid hotkey <Super>nokey: unknown key 'nokey'"},

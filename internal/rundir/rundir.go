@@ -25,6 +25,10 @@ var states = []string{"recording", "busy", "transform", "failed"}
 // Processing reports whether state is a transcription or transform phase: a dictation can be continued or discarded.
 func Processing(state string) bool { return state == "busy" || state == "transform" }
 
+// SendMark is the file `habla listen --send` (Enter while busy) leaves for the busy session: its delivery pastes and
+// presses Enter.
+func SendMark() string { return filepath.Join(Dir(), "send") }
+
 // Dir is $XDG_RUNTIME_DIR/habla (in RAM, private to the user), created on first use.
 func Dir() string {
 	base := os.Getenv("XDG_RUNTIME_DIR")

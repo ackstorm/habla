@@ -7,11 +7,12 @@ import (
 	"strings"
 )
 
-// Event is one key press or release. Keycode is the X keycode (PortalKey for the portal's shortcut); Time is the
-// X server timestamp.
+// Event is one key press or release. Keycode is the X keycode (PortalKey for the portal's shortcut); State is the X
+// modifier mask at the event; Time is the X server timestamp.
 type Event struct {
 	Press   bool
 	Keycode int
+	State   uint16
 	Time    uint32
 }
 
@@ -150,13 +151,23 @@ func DropAutoRepeat(events []Event) []Event {
 	return kept
 }
 
-// Hold turns hotkey events into "start" (press), "stop" (release) or "cancel" (Esc while held, or while busy).
+// Hold turns hotkey events into "start" (press), "stop" (release), "cancel" (Esc while held, or while busy) or "send"
+// (Enter while busy).
 type Hold struct {
-	keycode, escape int
-	held, cancelled bool
+	keycode, escape, enter int
+	mask                   uint16 // the hotkey's modifiers: Enter and a <Super>Return hotkey share a keycode
+	held, cancelled        bool
 }
 
-func NewHold(keycode, escape int) *Hold { return &Hold{keycode: keycode, escape: escape} }
+func NewHold(keycode, escape int) *Hold {
+	return &Hold{keycode: keycode, escape: escape, enter: NoEscape}
+}
+
+// WithEnter makes a press of enter while not held a "send", unless it carries the hotkey's modifiers (mask).
+func (h *Hold) WithEnter(enter int, mask uint16) *Hold {
+	h.enter, h.mask = enter, mask
+	return h
+}
 
 // Active is true from the press to the release, Esc included: the keyboard stays grabbed meanwhile.
 func (h *Hold) Active() bool { return h.held || h.cancelled }
@@ -164,7 +175,7 @@ func (h *Hold) Active() bool { return h.held || h.cancelled }
 func (h *Hold) Feed(events []Event) (actions []string) {
 	for _, e := range DropAutoRepeat(events) {
 		switch {
-		case e.Press && e.Keycode == h.keycode && !h.Active():
+		case e.Press && e.Keycode == h.keycode && e.State&h.mask == h.mask && !h.Active():
 			h.held = true
 			actions = append(actions, "start")
 		case e.Press && e.Keycode == h.escape && h.held:
@@ -172,6 +183,8 @@ func (h *Hold) Feed(events []Event) (actions []string) {
 			actions = append(actions, "cancel")
 		case e.Press && e.Keycode == h.escape && !h.Active(): // Esc reaches Habla unheld only while busy
 			actions = append(actions, "cancel")
+		case e.Press && e.Keycode == h.enter && !h.Active(): // so does Enter
+			actions = append(actions, "send")
 		case !e.Press && e.Keycode == h.keycode && h.Active():
 			if h.held {
 				actions = append(actions, "stop")
