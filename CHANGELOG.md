@@ -5,6 +5,11 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Added
+
+- The recording pill times transcription and transform: *Transcribing (0.8s)*, *Refining text (1.4s)*; the recording
+  time stays beside them.
+
 ### Changed
 
 - A tap of the hotkey (under 300 ms) or a recording with nothing above `trim_below_db` is no longer sent to the

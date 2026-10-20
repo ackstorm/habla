@@ -38,7 +38,9 @@
   `round(1 + sqrt(max(0, (level - 0.2) / 0.8)) * 23)` up to 24 px (-30 dBFS speech fills about half the height);
   colours still reflect actual peaks. The icon/meter section takes 30% of the width; text/timer/ESC take 70%.
   Text, icons and controls are vertically anchored to the bar's centre. Both processing sweeps take 650 ms each way.
-- `show(phase, hint)` preserves the window, width, position and last recording timer. An aqua spinner/sweep identifies
+- `show(phase, hint)` preserves the window, width, position and last recording timer. `busy`/`transform` add a
+  phase timer after the title (`PhaseLabel`, "Transcribing (0.8s)"): it starts at `state`'s mtime (`StateWritten`) when `show`
+  enters the phase and freezes when a frame sees a newer write (copying/pasting); `frame` reserves its width. An aqua spinner/sweep identifies
   `busy` (transcribing), a gold shimmering star/sweep identifies `transform`. Delivery retains the last visible phase
   without separate labels;
   Esc disappears once copying starts. `copy_failed` stays red until the next dictation. The Wayland notification

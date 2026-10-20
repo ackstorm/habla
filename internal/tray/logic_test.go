@@ -492,6 +492,24 @@ func TestRecordingSecondsCountFromTheStateFile(t *testing.T) {
 	}
 }
 
+func TestPhaseLabelRunsUntilDeliveryBegins(t *testing.T) {
+	since := time.Now()
+	for _, tc := range []struct {
+		until, now time.Time
+		want       string
+	}{
+		{time.Time{}, since.Add(840 * time.Millisecond), "(0.8s)"},
+		{since.Add(1260 * time.Millisecond), since.Add(time.Minute), "(1.3s)"},
+	} {
+		if got := PhaseLabel(since, tc.until, tc.now); got != tc.want {
+			t.Errorf("got %q, want %q", got, tc.want)
+		}
+	}
+	if got := PhaseLabel(time.Time{}, time.Time{}, since); got != "" {
+		t.Errorf("no start: %q", got)
+	}
+}
+
 func TestPlacePill(t *testing.T) {
 	one := []Rect{{0, 0, 1920, 1080}}
 	two := []Rect{{0, 0, 1920, 1080}, {1920, 0, 2560, 1440}}

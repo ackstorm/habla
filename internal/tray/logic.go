@@ -145,11 +145,32 @@ func ElapsedLabel(seconds float64) string {
 
 // RecordingSeconds is the time since `state` was written: while recording, since the recording started. 0 without it.
 func RecordingSeconds() float64 {
-	info, err := os.Stat(filepath.Join(rundir.Dir(), "state"))
-	if err != nil {
+	written := StateWritten()
+	if written.IsZero() {
 		return 0
 	}
-	return max(0, time.Since(info.ModTime()).Seconds())
+	return max(0, time.Since(written).Seconds())
+}
+
+// StateWritten is when `state` was last written: when its phase began. Zero without it.
+func StateWritten() time.Time {
+	info, err := os.Stat(filepath.Join(rundir.Dir(), "state"))
+	if err != nil {
+		return time.Time{}
+	}
+	return info.ModTime()
+}
+
+// PhaseLabel is the timer after the pill's title while transcribing or transforming, "(0.8s)": tenths of a second from
+// since to until, or to now while the phase runs (until zero). "" without a start.
+func PhaseLabel(since, until, now time.Time) string {
+	if since.IsZero() {
+		return ""
+	}
+	if until.IsZero() {
+		until = now
+	}
+	return fmt.Sprintf("(%.1fs)", max(0, until.Sub(since).Seconds()))
 }
 
 // The pill's peaks: -50 dBFS or quieter = empty, 0 dBFS = full.

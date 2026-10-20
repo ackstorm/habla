@@ -40,6 +40,7 @@ type pill struct {
 	levels                []float64
 	lastFrame             time.Time
 	elapsed               string
+	since, until          time.Time // the processing phase's start (StateWritten) and, once delivery begins, its end
 	width                 int32
 	ticker                uint32 // the frame timeout while shown; 0 when hidden
 }
@@ -85,6 +86,9 @@ func newPill() recordingView {
 
 func (p *pill) show(phase string, hint []Segment) {
 	visible := p.ticker != 0
+	if rundir.Processing(phase) && phase != p.phase {
+		p.since, p.until = StateWritten(), time.Time{}
+	}
 	p.phase, p.hint = phase, hint
 	if phase == "recording" {
 		p.levels = nil // a new recording never inherits the previous one's peaks
@@ -127,6 +131,10 @@ func (p *pill) frame() bool {
 		}
 		p.levels, p.lastFrame = levels, now
 		p.elapsed = ElapsedLabel(RecordingSeconds())
+	} else if rundir.Processing(p.phase) && p.until.IsZero() {
+		if written := StateWritten(); written.After(p.since) { // copying or pasting: the phase has ended
+			p.until = written
+		}
 	}
 	w := int32(583)
 	for _, phase := range []string{"recording", "busy", "transform", "copy_failed"} {
@@ -134,6 +142,9 @@ func (p *pill) frame() bool {
 		q.phase = phase
 		title, subtitle, _ := q.labels()
 		// Reserve all phases before showing the window, including unusually wide system fonts.
+		if rundir.Processing(phase) {
+			title += " (00.0s)" // the phase timer, drawn after the title
+		}
 		textWidth := max(pillText(p.measure, false, title, 0, 0, 13, "sans-serif", true),
 			pillText(p.measure, false, subtitle, 0, 0, 11, "sans-serif", false))
 		timerWidth := pillText(p.measure, false, p.elapsed, 0, 0, 11, "monospace", false)
@@ -342,8 +353,11 @@ func (p *pill) draw(cr uintptr) {
 	}
 	title, subtitle, cancel := p.labels()
 	gtk.CairoSetSourceRGBA(cr, ink[0]/255, ink[1]/255, ink[2]/255, 1)
-	pillText(cr, true, title, pillTextX, middle-3, 13, "sans-serif", true)
+	titleWidth := pillText(cr, true, title, pillTextX, middle-3, 13, "sans-serif", true)
 	gtk.CairoSetSourceRGBA(cr, 82/255.0, 97/255.0, 119/255.0, 1)
+	if rundir.Processing(p.phase) {
+		pillText(cr, true, PhaseLabel(p.since, p.until, time.Now()), pillTextX+titleWidth+6, middle-3, 11, "monospace", false)
+	}
 	pillText(cr, true, subtitle, pillTextX, middle+12, 11, "sans-serif", false)
 	timerWidth := pillText(cr, false, p.elapsed, 0, 0, 11, "monospace", false)
 	pillText(cr, true, p.elapsed, w-90-timerWidth, middle+4, 11, "monospace", false)
