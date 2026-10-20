@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  GOTOOLCHAIN: local
+  CGO_ENABLED: "0"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.25.x"
+      - run: go vet ./... && go test ./...
+      - name: Notes
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          v=${TAG#v}
+          # this version's CHANGELOG.md section, up to the next version or the link references
+          awk -v head="## [$v]" 'index($0, head) == 1 {f = 1; next} /^## \[/ || /^\[[^]]*\]: / {f = 0} f' CHANGELOG.md > changes.md
+          grep -q '[^[:space:]]' changes.md || { echo "CHANGELOG.md has no entries for $v" >&2; exit 1; }
+          sed "s/@VERSION@/$v/g" .github/release-notes.md |
+            awk 'FNR == NR {changes = changes $0 "\n"; next} $0 == "@CHANGES@" {printf "%s", changes; next} {print}' changes.md - > notes.md
+      - name: Build
+        env:
+          TAG: ${{ github.ref_name }}
+          CGO_ENABLED: "0"
+        run: |
+          for arch in amd64 arm64; do
+            GOOS=linux GOARCH=$arch go build -trimpath -ldflags "-s -w -X main.version=${TAG#v}" -o habla-linux-$arch .
+          done
+          sha256sum habla-linux-* > SHA256SUMS
+      - name: Publish
+        env:
+          TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$TAG" habla-linux-amd64 habla-linux-arm64 SHA256SUMS install.sh --title "Habla $TAG" --notes-file notes.md

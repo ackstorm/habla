@@ -1,0 +1,137 @@
+# Habla example: a different provider per service, two to choose from in each.
+# Copy it to ~/.config/habla/config.toml and export the keys you use:
+#   export OPENAI_API_KEY=...   GEMINI_API_KEY=...   ELEVENLABS_API_KEY=...
+# "provider" picks the active one; the tray switches it and --provider NAME overrides it for one run.
+# Keys are always env:VARIABLE or cmd:COMMAND, never literal.
+
+[general]
+max_seconds   = 300
+trim_below_db = -45                  # cut quieter audio (dBFS) at both ends before sending; 0 = off
+paste_keys    = "auto"               # auto | ctrl+v | ctrl+shift+v
+log_level     = "warn"               # error | warn | info | debug
+
+# habla tray only; habla listen takes --paste / --paste_enter instead.
+[tray]
+hotkey        = "<Super>space"
+paste         = true                 # also paste into the focused window
+paste_enter   = false                # and press Enter after pasting
+
+# Speech to text: Gemini active, OpenAI as the alternative.
+[stt]
+provider = "gemini"
+
+[stt.providers.gemini]
+api         = "gemini"
+endpoint    = "https://generativelanguage.googleapis.com/v1beta"
+auth_header = "x-goog-api-key"
+auth_scheme = "raw"
+api_key     = "env:GEMINI_API_KEY"
+model       = "gemini-3.5-transcribe"
+models      = ["gemini-3.5-transcribe"]
+transform   = "clean"                # Gemini detects the language: no language key
+
+[stt.providers.openai]
+api         = "openai"
+endpoint    = "https://api.openai.com/v1"
+api_key     = "env:OPENAI_API_KEY"
+model       = "gpt-4o-transcribe"
+models      = ["gpt-4o-transcribe", "gpt-4o-mini-transcribe"]
+language    = ""                     # "" = auto; the tray offers the languages list
+languages   = ["en", "es", "fr"]
+transform   = "clean"
+
+# Transforms run on the active [llm] provider. Prompts may span lines.
+[stt.transforms.clean]
+prompt = """Clean up this dictation: remove filler words (um, uh, like, you know) and false starts.
+When the speaker corrects themselves, keep only the final version.
+Fix punctuation and capitalization. Always write Kubernetes and PostgreSQL.
+Do not change the meaning or add anything. If unsure, leave the text as it is."""
+
+[stt.transforms.english]
+prompt = "Translate to English. Keep names and technical terms."
+
+[stt.transforms.commit]
+model  = "gpt-4o"                    # overrides the llm provider's model for this transform
+prompt = "Rewrite as a one-line Conventional Commits message: type(scope): subject."
+
+# Transforms: OpenAI active, Gemini as the alternative.
+[llm]
+provider = "openai"
+
+[llm.providers.openai]
+api      = "openai"
+endpoint = "https://api.openai.com/v1"
+api_key  = "env:OPENAI_API_KEY"
+model    = "gpt-4o-mini"
+models   = ["gpt-4o-mini", "gpt-4o"]
+
+[llm.providers.gemini]
+api         = "gemini"
+endpoint    = "https://generativelanguage.googleapis.com/v1beta"
+auth_header = "x-goog-api-key"
+auth_scheme = "raw"
+api_key     = "env:GEMINI_API_KEY"
+model       = "gemini-3.8-flash"
+models      = ["gemini-3.8-flash"]
+
+# Text to speech (habla say): ElevenLabs active, OpenAI as the alternative.
+[tts]
+provider = "elevenlabs"
+
+# ElevenLabs speaks only (tts): no styles, pick the accent with the voice. Voices are "Name=ID".
+[tts.providers.elevenlabs]
+api         = "elevenlabs"
+endpoint    = "https://api.elevenlabs.io/v1"
+auth_header = "xi-api-key"
+auth_scheme = "raw"
+api_key     = "env:ELEVENLABS_API_KEY"
+model       = "eleven_multilingual_v2"
+models      = ["eleven_multilingual_v2", "eleven_flash_v2_5"]
+voice       = "George"
+voices      = ["George=JBFqnCBsd6RMkjVDRZzb", "Alice=Xb7hH8MSUJpSbSDYk0k2"]
+format      = "wav"
+
+[tts.providers.openai]
+api               = "openai"
+endpoint          = "https://api.openai.com/v1"
+api_key           = "env:OPENAI_API_KEY"
+model             = "gpt-4o-mini-tts"
+models            = ["gpt-4o-mini-tts"]
+voice             = "coral"
+voices            = ["coral", "alloy", "marin", "cedar"]
+format            = "wav"
+instructions_mode = "instructions"   # send the style as the model's instructions
+style             = "storyteller"
+
+# Spoken conversation (habla live, experimental): OpenAI Realtime.
+[live]
+provider = "openai"
+
+[live.providers.openai]
+endpoint          = "wss://api.openai.com/v1/realtime"
+api_key           = "env:OPENAI_API_KEY"
+model             = "gpt-realtime"
+voice             = "marin"
+voices            = ["marin", "cedar"]
+instructions_mode = "instructions"
+style             = "calm"
+
+# Delivery styles, shared by tts and live providers.
+[styles.calm]
+instructions = "Speak clearly in a calm, friendly tone."
+
+[styles.storyteller]
+instructions = """Read like a warm storyteller.
+Take gentle pauses between sentences."""
+
+# Dictation: a 1 s pause after at least 10 s ends a segment; the timer restarts when speech resumes.
+[split]
+enabled = true
+after   = 10
+pause   = 1
+
+# USD per million tokens (ElevenLabs: per million characters as input), for habla stats when the
+# provider sends no cost. Example values: check your provider's pricing.
+[prices]
+"gpt-4o-mini"            = { input = 0.15, output = 0.6 }
+"eleven_multilingual_v2" = { input = 180.0 }

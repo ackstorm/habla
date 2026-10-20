@@ -1,0 +1,12 @@
+{
+  "name": "habla",
+  "description": "The Habla plugin for Claude Code and Codex: configuration and spoken replies.",
+  "owner": { "name": "Habla" },
+  "plugins": [
+    {
+      "name": "habla",
+      "source": "./plugins/habla",
+      "description": "Configure Habla through its TOML file and speak to the user out loud with habla say."
+    }
+  ]
+}
