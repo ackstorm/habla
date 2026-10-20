@@ -256,9 +256,13 @@ func interactive(t *testing.T, args ...string) (keys func(string), wait func() i
 // recording waits until the interactive run holds listen.pid (it cannot be seen as "recording" through
 // rundir.ReadState: the test binary is not named habla) and its recorder has created the WAV (its SIGINT handler
 // is installed by then: an earlier SIGINT would kill the fake).
+// recording waits for the session's recorder to have written a dictation's worth (minRecording) of audio.
 func recording(t *testing.T) {
 	t.Helper()
-	testenv.WaitFor(t, "listen.pid", func() bool { return exists(rundir.Listen) && exists("current.wav") })
+	testenv.WaitFor(t, "listen.pid", func() bool {
+		info, err := os.Stat(file("current.wav"))
+		return exists(rundir.Listen) && err == nil && info.Size() >= int64(len(audio.Header(0))+minRecording)
+	})
 }
 
 func emptyRunDir(t *testing.T) {
@@ -378,6 +382,23 @@ func TestEmptyTranscriptCopiesNothing(t *testing.T) {
 	want(t, notes(), note{"Nothing heard.", "", false})
 	want(t, e.Lines("copied"))
 	want(t, g.Paths(), "/v1/audio/transcriptions")
+}
+
+func TestTapStreamsNothing(t *testing.T) {
+	e, g, _ := setup(t, testenv.DefaultReplies, conf)
+	wav := filepath.Join(e.Dir, "tap.wav")
+	pcm := testenv.HelloPCM(t)[:minRecording-audio.FrameBytes]
+	if err := os.WriteFile(wav, append(audio.Header(int64(len(pcm))), pcm...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HABLA_FAKE_RECORDING", wav)
+	keys, wait := interactive(t)
+	testenv.WaitFor(t, "the whole recording", func() bool { return len(e.Lines("recorded")) > 0 })
+	keys("\n")
+	if code := wait(); code != 1 {
+		t.Fatal(code)
+	}
+	want(t, g.Paths())
 }
 
 func TestCopyFailureShowsTheText(t *testing.T) {
@@ -759,8 +780,7 @@ func TestStartThenStopInTheBackground(t *testing.T) {
 			if rundir.ReadState() != "recording" {
 				t.Fatal(rundir.ReadState())
 			}
-			// An earlier SIGINT would kill the fake recorder before it installs its handler.
-			testenv.WaitFor(t, "the recorder to start", func() bool { return exists("current.wav") })
+			recording(t) // an earlier SIGINT would kill the fake recorder before it installs its handler
 			pid := rundir.RunningPID(rundir.Listen)
 			if code := Main([]string{"--stop"}); code != 0 {
 				t.Fatal(code)
@@ -928,7 +948,7 @@ func TestStartPassesTheProviderToTheBackgroundSession(t *testing.T) {
 	if code := Main([]string{"--start", "--provider", "alt"}); code != 0 {
 		t.Fatal(code)
 	}
-	testenv.WaitFor(t, "the recorder to start", func() bool { return exists("current.wav") })
+	recording(t)
 	pid := rundir.RunningPID(rundir.Listen)
 	if code := Main([]string{"--stop"}); code != 0 {
 		t.Fatal(code)

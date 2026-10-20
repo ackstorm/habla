@@ -5,6 +5,12 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Changed
+
+- A tap of the hotkey (under 300 ms) or a recording with nothing above `trim_below_db` is no longer sent to the
+  speech-to-text API: Habla says *Nothing heard.* at once instead of paying for a request (`trim_below_db = 0` still
+  sends everything over 300 ms).
+
 ## [0.1.0] - 2026-10-20
 
 ### Added

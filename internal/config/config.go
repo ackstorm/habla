@@ -24,7 +24,7 @@ const DefaultTOML = `# Getting started: export OPENAI_API_KEY (or set the stt, l
 # The hotkey is hold-to-talk, and every service is optional.
 [general]
 max_seconds   = 300
-trim_below_db = -45                  # cut quieter audio (dBFS) at both ends before sending; 0 = off
+trim_below_db = -45                  # cut quieter audio (dBFS) at both ends; all quieter = not sent; 0 = off
 upload_interval_ms = 50              # audio upload polling interval while recording; 50–1000 ms
 paste_keys    = "auto"               # auto | ctrl+v | ctrl+shift+v
 log_level     = "warn"               # error | warn | info | debug, in ~/.local/state/habla/habla.log

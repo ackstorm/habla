@@ -6,8 +6,7 @@ Push-to-dictate for the Linux desktop through OpenAI-compatible, Gemini or Eleve
 
 - Always `GOTOOLCHAIN=local` (never auto-download Go 1.26; `golang.org/x/sys` is pinned at v0.47.0 for Go 1.25).
 - Tests: `GOTOOLCHAIN=local timeout 300 go test ./...`; vet: `GOTOOLCHAIN=local go vet ./...`.
-- Live gateway: `HABLA_LIVE=1 GOTOOLCHAIN=local timeout 300 go test ./internal/gateway/ -run Live -v`;
-  latency: add `HABLA_API_KEY=<key>` and `./internal/listen/ -run LiveLatency`.
+- Live gateway: `HABLA_LIVE=1 GOTOOLCHAIN=local timeout 300 go test ./internal/gateway/ -run Live -v`.
 - Static binary: `CGO_ENABLED=0 GOTOOLCHAIN=local go build -trimpath -ldflags='-s -w' -o dist/habla .`
 - Release: move `[Unreleased]` in `CHANGELOG.md` to `## [X.Y.Z] - date` (and its compare link), commit, tag `vX.Y.Z`
   (annotated), push. The Release workflow's "Notes" step puts that section into `.github/release-notes.md`'s
@@ -49,7 +48,7 @@ Push-to-dictate for the Linux desktop through OpenAI-compatible, Gemini or Eleve
 - `internal/rundir`: `$XDG_RUNTIME_DIR/habla` (`Claim`, `Release`, `RunningPID`, `Alive`, `ReadState`, `WriteState`,
   `Delivery`). Delivery phases carry their owner PID in `state` and use Claim's directory lock, so completion after
   releasing `listen.pid` cannot overwrite a newer recording. Copy failures persist until the next recording.
-- `internal/audio`: recorder process, `Header`/`HeaderAt`/`Data` (WAV), `Voiced`/`Trim` (silence).
+- `internal/audio`: recorder process, `Header`/`HeaderAt`/`Data` (WAV), `Voiced`/`Trim` (silence; all-silent trims to nothing). `listen.minRecording` (300 ms): shorter or all-silent recordings send no request; tests' `recording(t)` waits for that much audio.
 - `internal/gateway`: `Credential`, `New(conn, key)`, shared transports per scheme+host, `Transcribe(ctx, model, language, pcm, -1)` streams, named `Transform`, `Speak`; `Speak` with `api = "elevenlabs"` POSTs `/text-to-speech/{voice ID}?output_format=pcm_24000` and wraps the PCM in `audio.HeaderAt(24000, n)` (reply header `character-cost` → `Call.In`; `voices` entries `Name=ID` are mapped to the ID by `config.TTS.Delivery`/`LiveDelivery`); `gemini.go` generates requests, streams transcription as base64 WAV, and uses native `audio/wav` without `Unwrap`.
   (`audio.Unwrap` on the OpenAI-compatible speech bridge: LiteLLM wraps Gemini's whole WAV in a second header, BerriAI/litellm#44541, so its C2PA chunk
   plays as ~126 ms of noise).

@@ -73,7 +73,7 @@ func Voiced(frame []byte, belowDB int) bool {
 }
 
 // Trim returns the bounds of pcm without its leading and trailing silence, keeping PadFrames on each side.
-// belowDB 0 turns it off, and all-silent audio is returned whole (the gateway decides "Nothing heard").
+// belowDB 0 turns it off; all-silent audio is trimmed to nothing (start == end).
 // ponytail: belowDB is the calibration knob for quiet microphones (trim_below_db).
 func Trim(pcm []byte, belowDB int) (start, end int) {
 	first, last := -1, -1
@@ -89,7 +89,8 @@ func Trim(pcm []byte, belowDB int) (start, end int) {
 	}
 	if first < 0 {
 		if belowDB != 0 {
-			slog.Warn("trim: nothing above trim_below_db, sending the audio whole", "db", belowDB, "bytes", len(pcm))
+			slog.Info("trim: nothing above trim_below_db", "db", belowDB, "bytes", len(pcm))
+			return 0, 0
 		}
 		return 0, len(pcm)
 	}

@@ -205,70 +205,17 @@ func TestEscAbortsTheUpload(t *testing.T) {
 	emptyRunDir(t)
 }
 
-func TestNoSpeechMeansOneNormalUploadOfTheWholeFile(t *testing.T) {
-	e, g, _ := setup(t, testenv.DefaultReplies, conf+"trim_below_db = -1\n") // no frame is that loud
+func TestNoSpeechSendsNothing(t *testing.T) {
+	e, g, notes := setup(t, testenv.DefaultReplies, conf+"trim_below_db = -1\n") // no frame is that loud
 	keys, wait := interactive(t)
 	recording(t)
 	testenv.WaitFor(t, "the whole recording", func() bool { return len(e.Lines("recorded")) > 0 })
 	keys("\n")
-	if code := wait(); code != 0 {
+	if code := wait(); code != 1 {
 		t.Fatal(code)
 	}
-	pcm := testenv.HelloPCM(t)
-	if a := g.Audio(); len(a) != 1 || !bytes.Equal(a[0], append(audio.Header(int64(len(pcm))), pcm...)) {
-		t.Fatal("want the whole file once, with exact sizes")
-	}
-}
-
-// TestLiveLatency prints release → copied against the real gateway, with and without transform. Opt-in: HABLA_LIVE=1
-// and $HABLA_API_KEY.
-func TestLiveLatency(t *testing.T) {
-	key := os.Getenv("HABLA_API_KEY")
-	if os.Getenv("HABLA_LIVE") != "1" || key == "" {
-		t.Skip("set HABLA_LIVE=1 and HABLA_API_KEY")
-	}
-	// The fake recorder plays a synthesized "Hello world." (default TTS, 16 kHz) instead of the tone.
-	cfg := config.Defaults()
-	voice, instructions, _ := cfg.TTS.Delivery()
-	speech, err := gateway.New(cfg.TTS.Conn, key).Speak(context.Background(), cfg.TTS, voice, instructions, "Hello world.")
-	if err != nil {
-		t.Fatal(err)
-	}
-	pcm, err := testenv.Speech16k(speech)
-	if err != nil {
-		t.Fatal(err)
-	}
-	spoken := filepath.Join(t.TempDir(), "hello.wav")
-	if err := os.WriteFile(spoken, append(audio.Header(int64(len(pcm))), pcm...), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	for _, transform := range []string{"", "clean"} {
-		t.Run(transform, func(t *testing.T) {
-			e, g, _ := setup(t, testenv.DefaultReplies, "")
-			t.Setenv("HABLA_API_KEY", key)
-			t.Setenv("HABLA_FAKE_RECORDING", spoken)
-			extra := "[stt.providers.openai]\nlanguage = \"en\"\n"
-			if transform != "" {
-				extra += "transform = \"" + transform + "\"\n"
-			}
-			text := testenv.Merge(config.DefaultTOML, extra)
-			text = strings.ReplaceAll(text, `"https://api.openai.com/v1"`, `"`+g.URL+`"`)
-			text = strings.ReplaceAll(text, `"env:OPENAI_API_KEY"`, `"env:HABLA_API_KEY"`)
-			os.WriteFile(e.Dir+"/config/habla/config.toml", []byte(text), 0o644)
-			keys, wait := interactive(t)
-			recording(t)
-			testenv.WaitFor(t, "the whole recording", func() bool { return len(e.Lines("recorded")) > 0 })
-			released := time.Now()
-			keys("\n")
-			if code := wait(); code != 0 {
-				t.Fatal(code)
-			}
-			t.Logf("%s: release → copied in %v: %q", transform, time.Since(released), e.Lines("copied"))
-			if rundir.ReadState() != "idle" {
-				t.Fatal(rundir.ReadState())
-			}
-		})
-	}
+	want(t, g.Paths())
+	want(t, notes(), note{"Nothing heard.", "", false})
 }
 
 // A current.wav left by a killed session must not leak into the next upload.

@@ -6,7 +6,7 @@
 
 [general]
 max_seconds   = 300
-trim_below_db = -45                  # cut quieter audio (dBFS) at both ends before sending; 0 = off
+trim_below_db = -45                  # cut quieter audio (dBFS) at both ends; all quieter = not sent; 0 = off
 paste_keys    = "auto"               # auto | ctrl+v | ctrl+shift+v
 log_level     = "warn"               # error | warn | info | debug
 

@@ -122,8 +122,8 @@ func TestTrim(t *testing.T) {
 		t.Fatal("trimming off still trimmed", start, end)
 	}
 	silent := pcm(1000, 0)
-	if start, end := audio.Trim(silent, -45); start != 0 || end != len(silent) {
-		t.Fatal("all-silent audio must be kept whole", start, end)
+	if start, end := audio.Trim(silent, -45); start != end {
+		t.Fatal("all-silent audio must trim to nothing", start, end)
 	}
 	if start, end := audio.Trim(testenv.HelloPCM(t), -45); start >= end {
 		t.Fatal("the hello clip trimmed away", start, end)

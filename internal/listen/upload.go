@@ -20,6 +20,9 @@ import (
 // much is left to upload. 500 ms of 16 kHz mono s16.
 const holdBack = 16000
 
+// minRecording is the shortest recording Habla sends: a tap of the hotkey is not a dictation. 300 ms.
+const minRecording = 9600
+
 // upload gets the API key while the recording runs and, once speech starts, streams current.wav to the gateway as
 // the recorder writes it.
 type upload struct {
@@ -174,6 +177,12 @@ func (u *upload) stream(ctx context.Context) transcript {
 			}
 		}
 		pcm := pcmOf(buf)
+		if len(pcm) < minRecording { // only before the first request: pcm only grows
+			if stopped {
+				return transcript{} // a tap: transcribeFile sends nothing
+			}
+			continue
+		}
 		if begin < 0 {
 			begin, scanned = speechStart(pcm, scanned, u.cfg.TrimBelowDB)
 			if begin < 0 {
@@ -323,7 +332,8 @@ func readMore(f *os.File, buf []byte) []byte {
 	}
 }
 
-// transcribeFile uploads the WAV file's PCM without its leading and trailing silence.
+// transcribeFile uploads the WAV file's PCM without its leading and trailing silence. A tap (under minRecording) or
+// audio with nothing above trim_below_db sends nothing and transcribes to "" ("Nothing heard.").
 func transcribeFile(ctx context.Context, client *gateway.Client, model, language, wav string, belowDB int) (string, error) {
 	data, err := os.ReadFile(wav)
 	if err != nil {
@@ -335,6 +345,10 @@ func transcribeFile(ctx context.Context, client *gateway.Client, model, language
 	}
 	pcm := data[offset : offset+length]
 	start, end := audio.Trim(pcm, belowDB)
+	if len(pcm) < minRecording || start == end {
+		slog.Info("nothing to send", "bytes", len(pcm))
+		return "", nil
+	}
 	ctx, cancel := context.WithTimeout(ctx, gateway.TranscribeTimeout) // a body past the socket buffers can stall
 	defer cancel()
 	return client.Transcribe(ctx, model, language, bytes.NewReader(pcm[start:end]), int64(end-start))
