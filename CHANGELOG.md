@@ -5,6 +5,10 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Fixed
+
+- The keypad's Enter sends a busy dictation too, not only the main Enter.
+
 ## [0.1.1] - 2026-10-20
 
 ### Added

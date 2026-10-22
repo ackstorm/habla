@@ -12,7 +12,7 @@ import (
 	"github.com/jezek/xgb/xproto"
 )
 
-const keysymEscape, keysymReturn = 0xff1b, 0xff0d
+const keysymEscape, keysymReturn, keysymKPEnter = 0xff1b, 0xff0d, 0xff8d
 
 // autoRepeatGap is how long a release waits for the press that would make it auto-repeat. xgb hands events over one
 // at a time from its reader goroutine, so the pair may not be queued together yet. It delays a real release (stop)
@@ -31,9 +31,9 @@ type noDisplay struct{ error }
 // connection of its own, plus a keyboard grab from the press to the release, so Esc reaches Habla and auto-repeat
 // releases don't end the grab.
 type x11Hotkey struct {
-	conn          *xgb.Conn
-	root          xproto.Window
-	escape, enter xproto.Keycode
+	conn                   *xgb.Conn
+	root                   xproto.Window
+	escape, enter, kpEnter xproto.Keycode
 }
 
 // grabX11 grabs text (`<Super>space`) and calls act("--start" | "--stop" | "--cancel" | "--send") from its goroutine.
@@ -69,15 +69,15 @@ func grabX11(text string, act func(flag string)) (*x11Hotkey, error) {
 			return nil, noDisplay{err}
 		}
 	}
-	h := &x11Hotkey{conn, root, codes[keysymEscape], codes[keysymReturn]}
-	go h.loop(root, hotkey.NewHold(int(code), int(h.escape)).WithEnter(int(h.enter), mask), act)
+	h := &x11Hotkey{conn, root, codes[keysymEscape], codes[keysymReturn], codes[keysymKPEnter]}
+	go h.loop(root, hotkey.NewHold(int(code), int(h.escape)).WithEnter(mask, int(h.enter), int(h.kpEnter)), act)
 	return h, nil
 }
 
-// grabBusyKeys grabs Esc and Enter (on) or lets them go: while a dictation is busy, Esc cancels it and Enter sends it
+// grabBusyKeys grabs Esc and both Enters (on) or lets them go: while a dictation is busy, Esc cancels it and Enter sends it
 // (Hold.Feed). ponytail: unchecked: a key taken by another app's grab just stays theirs.
 func (h *x11Hotkey) grabBusyKeys(on bool) {
-	for _, key := range []xproto.Keycode{h.escape, h.enter} {
+	for _, key := range []xproto.Keycode{h.escape, h.enter, h.kpEnter} {
 		if key == 0 {
 			continue
 		}

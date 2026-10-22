@@ -4,6 +4,7 @@ package hotkey
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -154,17 +155,18 @@ func DropAutoRepeat(events []Event) []Event {
 // Hold turns hotkey events into "start" (press), "stop" (release), "cancel" (Esc while held, or while busy) or "send"
 // (Enter while busy).
 type Hold struct {
-	keycode, escape, enter int
-	mask                   uint16 // the hotkey's modifiers: Enter and a <Super>Return hotkey share a keycode
-	held, cancelled        bool
+	keycode, escape int
+	enter           []int  // Return and the keypad's Enter
+	mask            uint16 // the hotkey's modifiers: Enter and a <Super>Return hotkey share a keycode
+	held, cancelled bool
 }
 
 func NewHold(keycode, escape int) *Hold {
-	return &Hold{keycode: keycode, escape: escape, enter: NoEscape}
+	return &Hold{keycode: keycode, escape: escape}
 }
 
-// WithEnter makes a press of enter while not held a "send", unless it carries the hotkey's modifiers (mask).
-func (h *Hold) WithEnter(enter int, mask uint16) *Hold {
+// WithEnter makes a press of any enter key while not held a "send", unless it carries the hotkey's modifiers (mask).
+func (h *Hold) WithEnter(mask uint16, enter ...int) *Hold {
 	h.enter, h.mask = enter, mask
 	return h
 }
@@ -183,7 +185,7 @@ func (h *Hold) Feed(events []Event) (actions []string) {
 			actions = append(actions, "cancel")
 		case e.Press && e.Keycode == h.escape && !h.Active(): // Esc reaches Habla unheld only while busy
 			actions = append(actions, "cancel")
-		case e.Press && e.Keycode == h.enter && !h.Active(): // so does Enter
+		case e.Press && slices.Contains(h.enter, e.Keycode) && !h.Active(): // so does Enter
 			actions = append(actions, "send")
 		case !e.Press && e.Keycode == h.keycode && h.Active():
 			if h.held {

@@ -213,11 +213,16 @@ func TestTrayEnterWhileBusySendsGUI(t *testing.T) {
 	xdo(t, "keyup", "super+Return")
 	testenv.WaitFor(t, "transcribing", func() bool { return rundir.ReadState() == "busy" })
 	mark := filepath.Join(rundir.Dir(), "send")
-	testenv.WaitFor(t, "Enter while busy to leave the send mark", func() bool {
-		xdo(t, "key", "Return") // the grab follows the busy state through the tray's file watch
-		_, err := os.Stat(mark)
-		return err == nil
-	})
+	for _, key := range []string{"Return", "KP_Enter"} {
+		testenv.WaitFor(t, key+" while busy to leave the send mark", func() bool {
+			xdo(t, "key", key) // the grab follows the busy state through the tray's file watch
+			_, err := os.Stat(mark)
+			return err == nil
+		})
+		if err := os.Remove(mark); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if data, _ := os.ReadFile(log); t.Failed() {
 		t.Logf("tray output:\n%s", data)
 	}
