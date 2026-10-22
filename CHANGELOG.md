@@ -5,6 +5,8 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-22
+
 ### Fixed
 
 - The keypad's Enter sends a busy dictation too, not only the main Enter.
@@ -51,6 +53,7 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 - `habla` skill for Claude Code and Codex: configuration and spoken replies via `habla say`.
 - One static binary (amd64, arm64) installed by `install.sh` with checksum verification and tray autostart.
 
-[Unreleased]: https://github.com/ackstorm/habla/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/ackstorm/habla/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/ackstorm/habla/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/ackstorm/habla/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/ackstorm/habla/releases/tag/v0.1.0
