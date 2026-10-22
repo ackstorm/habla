@@ -95,14 +95,11 @@ func (h *x11Hotkey) grabBusyKeys(on bool) {
 			}
 		}
 	}
-	if !on {
-		h.unlockFocus(true)
-	}
 }
 
 // lockFocus grabs the keyboard and pointer after Enter, so neither Alt+Tab nor a click moves the focus away from
-// the window the dictation will be pasted into; Esc still cancels. It ends when the dictation leaves busy or transform
-// (grabBusyKeys(false), before desktop.Paste, which waits for it) or after maxFocusLock.
+// the window the dictation will be pasted into; Esc still cancels. It lasts through copying and ends at pasting (the
+// tray's refresh; XTEST keys would reach this grab, so desktop.Paste waits for it) or after maxFocusLock.
 func (h *x11Hotkey) lockFocus() {
 	h.lockMu.Lock()
 	defer h.lockMu.Unlock()

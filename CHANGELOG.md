@@ -5,6 +5,11 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Fixed
+
+- The focus lock after Enter lasts through copying, until the paste: it used to end before the copy, leaving time
+  to switch windows between the paste and Enter.
+
 ## [0.1.3] - 2026-10-22
 
 ### Changed

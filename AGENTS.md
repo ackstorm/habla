@@ -72,7 +72,7 @@ Push-to-dictate for the Linux desktop through OpenAI-compatible, Gemini or Eleve
 - The tray grabs Esc, Return and KP_Enter on X11 only while the state is `busy` or `transform` (`grabBusyKeys`); `Hold.Feed` maps an
   unheld Esc to cancel and an unheld Enter to send (`habla listen --send` → `rundir.SendMark`, read and removed by `deliver`:
   paste + Enter; a new session removes a stale one). `Event.State` tells a plain Enter from a `<Super>Return` hotkey.
-  After a send the tray's `lockFocus` grabs the keyboard and pointer until `grabBusyKeys(false)` (or 60 s); XTEST keys
+  After a send the tray's `lockFocus` grabs the keyboard and pointer through `copying`, until `pasting` (or 60 s); XTEST keys
   go to a grabbing client, so `pasteX11` first waits (`waitUngrabbed`, 1 s) until no client holds the keyboard.
 
 - Tray hotkey auto-repeat: xgb hands events over one at a time, so a repeat's release+press pair is not always queued
