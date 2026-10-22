@@ -3,6 +3,7 @@ package desktop
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"time"
@@ -23,6 +24,8 @@ const (
 	keysymV        xproto.Keysym = 0x0076
 	keysymReturn   xproto.Keysym = 0xff0d
 )
+
+const grabWait = time.Second
 
 // IsTerminal reports whether a window with these WM_CLASS names is a terminal emulator.
 func IsTerminal(classNames []string) bool {
@@ -75,6 +78,7 @@ func pasteX11(pasteKeys string, enter bool) error {
 	if enter && codes[keysymReturn] == 0 {
 		return errors.New("the keyboard map has no key for Enter")
 	}
+	waitUngrabbed(conn, root)
 	releaseModifiers(conn, root)
 	var first error // ponytail: keep sending the releases after a failure so no key stays down
 	send := func(kind byte, code xproto.Keycode) {
@@ -101,6 +105,21 @@ func pasteX11(pasteKeys string, enter bool) error {
 	}
 	_, err = xproto.GetInputFocus(conn).Reply() // a round trip: the server has handled the events before we close
 	return err
+}
+
+// waitUngrabbed waits up to grabWait while another client (the tray's focus lock after Enter) holds the keyboard:
+// XTEST keystrokes go to the grabbing client, not the focused window. Then it pastes anyway.
+func waitUngrabbed(conn *xgb.Conn, root xproto.Window) {
+	for deadline := time.Now().Add(grabWait); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		r, err := xproto.GrabKeyboard(conn, false, root, xproto.TimeCurrentTime, xproto.GrabModeAsync, xproto.GrabModeAsync).Reply()
+		if err != nil || r.Status != xproto.GrabStatusAlreadyGrabbed {
+			if err == nil && r.Status == xproto.GrabStatusSuccess {
+				xproto.UngrabKeyboard(conn, xproto.TimeCurrentTime)
+			}
+			return
+		}
+	}
+	slog.Warn("pasting while another app holds the keyboard")
 }
 
 // ActiveWindow is the window in _NET_ACTIVE_WINDOW; 0 when unknown.

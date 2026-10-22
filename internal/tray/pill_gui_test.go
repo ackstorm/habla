@@ -176,7 +176,7 @@ func (x *xserver) wantPill(t *testing.T, scale int) {
 	testenv.WaitFor(t, "the pill", func() bool { g, w = x.pill(t); return g != nil })
 	centre, bottom := int(g.X)+int(g.Width)/2, int(g.Y)+int(g.Height)
 	if centre < 640-scale || centre > 640+scale || bottom != 800-48*scale || int(g.Height) != 54*scale ||
-		int(g.Width) != 604*scale {
+		int(g.Width) != 612*scale {
 		t.Fatalf("pill at %dx%d+%d+%d: centre %d, bottom %d; want centre 640, bottom %d", g.Width, g.Height, g.X, g.Y,
 			centre, bottom, 800-48*scale)
 	}
@@ -187,7 +187,7 @@ func (x *xserver) wantPill(t *testing.T, scale int) {
 	if edge := x.pixel(t, w, int(g.Width)/2, 4*scale); edge != [3]byte{181, 196, 211} {
 		t.Errorf("outline %v, want a pale edge around the white body", edge)
 	}
-	for _, sep := range []int{176, 504} {
+	for _, sep := range []int{176, 512} {
 		pixel := x.pixel(t, w, sep*scale, 20*scale)
 		if pixel[0] < 230 || pixel[0] > 245 || pixel[1] < 235 || pixel[2] < 240 {
 			t.Errorf("separator %v, want a very subtle line", pixel)

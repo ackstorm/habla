@@ -25,7 +25,7 @@ const (
 	meterWidth = 115
 	pillTextX  = 51 + meterWidth + 21
 	keysWidth  = 100 // the Esc (and Enter) section at the right end: as wide in every phase, so nothing moves
-	willSend   = "Will paste and send"
+	willSend   = "Will paste and send (keep this window focused)"
 )
 
 // recordingView follows a dictation through recording, processing and clipboard delivery.
@@ -143,7 +143,7 @@ func (p *pill) frame() bool {
 		_, err := os.Stat(rundir.SendMark())
 		p.queued = err == nil
 	}
-	w := int32(604) // even: centred to the pixel
+	w := int32(612) // even: centred to the pixel
 	for _, phase := range []string{"recording", "busy", "transform", "copy_failed"} {
 		q := *p
 		q.phase = phase

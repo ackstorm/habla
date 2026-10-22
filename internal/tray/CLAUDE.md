@@ -45,8 +45,8 @@
   without separate labels;
   Esc disappears once copying starts. `keysWidth` (100 px) keeps the Esc section as wide in every phase: while busy it
   holds `ESC / ↵` (*cancel / send*); `queued` (the send mark seen by `frame`, kept through delivery) turns ↵ into an aqua
-  ✓ (*cancel / queued*) and the subtitle into *Will paste and send*. ↵ and ✓ are filled paths: the toy text API has no
-  glyph fallback. The base width is 604 (even: `wantPill` checks the centre to the pixel). `copy_failed` stays red until the next dictation. The Wayland notification
+  ✓ (*cancel / queued*) and the subtitle into *Will paste and send (keep this window focused)*. ↵ and ✓ are filled paths: the toy text API has no
+  glyph fallback. The base width is 612 (even: `wantPill` checks the centre to the pixel). `copy_failed` stays red until the next dictation. The Wayland notification
   fallback follows the visible phases, closing its previous notification before replacing it, without delivery banners.
 - Drawn entirely with cairo in one DrawingArea (no labels bound): `pillText` measures and paints the phase text
   and right-aligned recording timer for both sizing

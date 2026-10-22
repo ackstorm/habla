@@ -158,7 +158,7 @@ The recording duration sits at the right, before the cancellation
 hint, and freezes when recording ends. **Transcribing** uses aqua activity and a rotating spinner; **Refining text**
 uses gold activity and a shimmering star. Both activity bars bounce every 0.65 seconds. Escape remains visible in every phase where it can cancel,
 beside Enter (*cancel / send*) while transcribing or refining; after Enter the key shows a tick (*cancel / queued*) and
-the subtitle *Will paste and send*; recording
+the subtitle *Will paste and send (keep this window focused)*; recording
 started from the tray or through a Wayland shortcut keeps the tray instructions. Clicks pass through the bar and it
 never takes focus. The last phase stays visible until copying and pasting finish. A copy failure leaves an error
 bar until the next dictation; the notification keeps the text. On Wayland the bar needs layer-shell (KDE Plasma,
@@ -177,7 +177,9 @@ Hold the hotkey to record, release to transcribe. Default `Super+Space` (`hotkey
 Press again while Habla is still transcribing or transforming (amber icon) to continue the same dictation: it drops a
 running transform, waits for the last part, transforms the joined text once and copies it. Esc while transcribing or
 transforming discards the whole dictation (X11; elsewhere `habla listen --cancel`), and Enter pastes it and presses
-Enter once it is ready, whatever the paste setting (X11; elsewhere `habla listen --send`).
+Enter once it is ready, whatever the paste setting (X11; elsewhere `habla listen --send`). After Enter, Habla holds
+the keyboard and mouse until it pastes (at most 60 s), so the focus stays on the window you dictated for; Esc still
+cancels.
 
 Dictation splits automatically by default (`[split] enabled = true`, `after = 10`, `pause = 1`). Audio uploads
 while you speak; a one-second pause ends a segment once it has lasted at least ten seconds. The timer restarts

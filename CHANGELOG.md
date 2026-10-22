@@ -5,6 +5,12 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Changed
+
+- After Enter while busy, Habla holds the keyboard and mouse until it pastes (at most 60 s; Esc still cancels), so
+  Alt+Tab or a click can't move the paste to another window. The pill says *Will paste and send (keep this window
+  focused)*.
+
 ## [0.1.2] - 2026-10-22
 
 ### Fixed

@@ -204,7 +204,8 @@ func TestTrayEnterWhileBusySendsGUI(t *testing.T) {
 	r.HoldSTT = make(chan struct{})
 	g := testenv.NewGateway(t, r)
 	e.WriteConfig(t, g, "[tray]\nhotkey = \"<Super>Return\"\n")
-	defer close(r.HoldSTT)
+	release := sync.OnceFunc(func() { close(r.HoldSTT) })
+	defer release()
 	log, _ := startTray(t, e, true)
 	waitLog(t, log, "No tray to show Habla's icon")
 
@@ -223,9 +224,36 @@ func TestTrayEnterWhileBusySendsGUI(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	if got := keyboardGrab(t); got != xproto.GrabStatusAlreadyGrabbed {
+		t.Errorf("keyboard grab while sending = %d, want the focus lock (AlreadyGrabbed)", got)
+	}
+	xdo(t, "key", "Return") // the mark again: the dictation is pasted, then the lock must be gone
+	testenv.WaitFor(t, "the send mark", func() bool { _, err := os.Stat(mark); return err == nil })
+	release()
+	testenv.WaitFor(t, "Hola. copied", func() bool { return slices.Equal(e.Lines("copied"), []string{"Hola."}) })
+	testenv.WaitFor(t, "idle", idle)
+	if got := keyboardGrab(t); got != xproto.GrabStatusSuccess {
+		t.Errorf("keyboard grab after the paste = %d, want Success: the focus lock outlived the dictation", got)
+	}
 	if data, _ := os.ReadFile(log); t.Failed() {
 		t.Logf("tray output:\n%s", data)
 	}
+}
+
+// keyboardGrab tries to grab the keyboard from a connection of its own (released on close) and returns the status.
+func keyboardGrab(t *testing.T) byte {
+	t.Helper()
+	conn, err := xgb.NewConn()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	root := xproto.Setup(conn).DefaultScreen(conn).Root
+	r, err := xproto.GrabKeyboard(conn, false, root, xproto.TimeCurrentTime, xproto.GrabModeAsync, xproto.GrabModeAsync).Reply()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r.Status
 }
 
 func TestTrayHotkeyProblemsGUI(t *testing.T) {

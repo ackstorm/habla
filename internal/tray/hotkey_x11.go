@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/ackstorm/habla/internal/desktop"
@@ -18,6 +19,9 @@ const keysymEscape, keysymReturn, keysymKPEnter = 0xff1b, 0xff0d, 0xff8d
 // at a time from its reader goroutine, so the pair may not be queued together yet. It delays a real release (stop)
 // by this much.
 const autoRepeatGap = 20 * time.Millisecond
+
+// maxFocusLock bounds the focus lock after Enter, in case the dictation never leaves busy or transform.
+const maxFocusLock = 60 * time.Second
 
 var errTaken = errors.New("taken by another app")
 
@@ -34,6 +38,8 @@ type x11Hotkey struct {
 	conn                   *xgb.Conn
 	root                   xproto.Window
 	escape, enter, kpEnter xproto.Keycode
+	lockMu                 sync.Mutex
+	lockTimer              *time.Timer // non-nil while Enter holds the keyboard and pointer (lockFocus)
 }
 
 // grabX11 grabs text (`<Super>space`) and calls act("--start" | "--stop" | "--cancel" | "--send") from its goroutine.
@@ -69,7 +75,7 @@ func grabX11(text string, act func(flag string)) (*x11Hotkey, error) {
 			return nil, noDisplay{err}
 		}
 	}
-	h := &x11Hotkey{conn, root, codes[keysymEscape], codes[keysymReturn], codes[keysymKPEnter]}
+	h := &x11Hotkey{conn: conn, root: root, escape: codes[keysymEscape], enter: codes[keysymReturn], kpEnter: codes[keysymKPEnter]}
 	go h.loop(root, hotkey.NewHold(int(code), int(h.escape)).WithEnter(mask, int(h.enter), int(h.kpEnter)), act)
 	return h, nil
 }
@@ -89,6 +95,39 @@ func (h *x11Hotkey) grabBusyKeys(on bool) {
 			}
 		}
 	}
+	if !on {
+		h.unlockFocus(true)
+	}
+}
+
+// lockFocus grabs the keyboard and pointer after Enter, so neither Alt+Tab nor a click moves the focus away from
+// the window the dictation will be pasted into; Esc still cancels. It ends when the dictation leaves busy or transform
+// (grabBusyKeys(false), before desktop.Paste, which waits for it) or after maxFocusLock.
+func (h *x11Hotkey) lockFocus() {
+	h.lockMu.Lock()
+	defer h.lockMu.Unlock()
+	if h.lockTimer != nil {
+		return
+	}
+	xproto.GrabKeyboard(h.conn, false, h.root, xproto.TimeCurrentTime, xproto.GrabModeAsync, xproto.GrabModeAsync).Reply()
+	xproto.GrabPointer(h.conn, false, h.root, 0, xproto.GrabModeAsync, xproto.GrabModeAsync, 0, 0, xproto.TimeCurrentTime).Reply()
+	h.lockTimer = time.AfterFunc(maxFocusLock, func() { h.unlockFocus(true) })
+}
+
+// unlockFocus ends the focus lock, if any; keyboard false keeps the keyboard grabbed for a hold that took it over.
+func (h *x11Hotkey) unlockFocus(keyboard bool) {
+	h.lockMu.Lock()
+	defer h.lockMu.Unlock()
+	if h.lockTimer == nil {
+		return
+	}
+	h.lockTimer.Stop()
+	h.lockTimer = nil
+	xproto.UngrabPointer(h.conn, xproto.TimeCurrentTime)
+	if keyboard {
+		xproto.UngrabKeyboard(h.conn, xproto.TimeCurrentTime)
+	}
+	xproto.GetInputFocus(h.conn).Reply() // a round trip: the grabs are gone when this returns
 }
 
 // close releases the grabs and ends the loop.
@@ -124,8 +163,12 @@ func (h *x11Hotkey) loop(root xproto.Window, hold *hotkey.Hold, act func(string)
 		for _, action := range hold.Feed(batch) {
 			slog.Debug("hold "+action, "source", "x11")
 			act("--" + action)
+			if action == "send" {
+				h.lockFocus()
+			}
 		}
 		if active := hold.Active(); active && !grabbed {
+			h.unlockFocus(false) // the hold's own keyboard grab takes over
 			xproto.GrabKeyboard(h.conn, false, root, xproto.TimeCurrentTime, xproto.GrabModeAsync, xproto.GrabModeAsync).Reply()
 		} else if grabbed && !active {
 			xproto.UngrabKeyboard(h.conn, xproto.TimeCurrentTime)
