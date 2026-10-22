@@ -240,6 +240,35 @@ func TestTrayEnterWhileBusySendsGUI(t *testing.T) {
 	}
 }
 
+func TestTrayEscCancelsDuringTheFocusLockGUI(t *testing.T) {
+	e, _ := guiEnv(t, "")
+	r := testenv.DefaultReplies
+	r.HoldSTT = make(chan struct{})
+	g := testenv.NewGateway(t, r)
+	e.WriteConfig(t, g, "")
+	defer close(r.HoldSTT)
+	log, _ := startTray(t, e, true)
+	waitLog(t, log, "No tray to show Habla's icon")
+
+	xdo(t, "keydown", "super+space")
+	testenv.WaitFor(t, "recording", recording)
+	xdo(t, "keyup", "super+space")
+	testenv.WaitFor(t, "transcribing", func() bool { return rundir.ReadState() == "busy" })
+	testenv.WaitFor(t, "the focus lock after Enter", func() bool {
+		xdo(t, "key", "Return")
+		return keyboardGrab(t) == xproto.GrabStatusAlreadyGrabbed
+	})
+	xdo(t, "key", "Escape") // a stuck transcription: Esc must still cancel and unlock
+	testenv.WaitFor(t, "idle after Esc", idle)
+	testenv.WaitFor(t, "the lock gone after Esc", func() bool { return keyboardGrab(t) == xproto.GrabStatusSuccess })
+	if copied := e.Lines("copied"); len(copied) != 0 {
+		t.Errorf("copied = %q after Esc, want nothing", copied)
+	}
+	if data, _ := os.ReadFile(log); t.Failed() {
+		t.Logf("tray output:\n%s", data)
+	}
+}
+
 // keyboardGrab tries to grab the keyboard from a connection of its own (released on close) and returns the status.
 func keyboardGrab(t *testing.T) byte {
 	t.Helper()
