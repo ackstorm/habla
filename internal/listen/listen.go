@@ -37,6 +37,11 @@ func Main(args []string) int {
 	status := fs.Bool("status", false, "print idle, recording, busy, transform, copying, pasting, copy_failed or failed")
 	session := fs.Bool("session", false, "internal: the background recording that --start runs")
 	providerFlag := fs.String("provider", "", "use the stt provider `NAME` for this run")
+	transform = nil // Main runs more than once in tests
+	fs.Func("transform", "use the [stt.transforms.*] `NAME` for this run (\"\": none)", func(s string) error {
+		transform = &s
+		return nil
+	})
 	logLevel := fs.String("log", "", "log at `LEVEL` (error, warn, info, debug) for this run")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -99,6 +104,9 @@ var provider string
 // pasteEnter is --paste_enter, like provider.
 var pasteEnter bool
 
+// transform is --transform, like provider; nil: the provider's own.
+var transform *string
+
 // startBackground runs `habla listen --session` detached (Go cannot fork) and returns once it is recording, or has
 // failed to start.
 func startBackground(paste bool) int {
@@ -121,6 +129,9 @@ func startBackground(paste bool) int {
 	}
 	if provider != "" {
 		args = append(args, "--provider", provider)
+	}
+	if transform != nil {
+		args = append(args, "--transform", *transform)
 	}
 	cmd := exec.Command(self, args...) // stdin, stdout and stderr: /dev/null
 	cmd.Args[0] = "habla"              // rundir.Alive only accepts a process named habla
@@ -245,6 +256,12 @@ func loadConfig(desktopNotify, paste bool) (*config.Config, error) {
 	}
 	if provider != "" {
 		if err := cfg.Use("stt", provider); err != nil {
+			desktop.ConfigError(err, desktopNotify)
+			return nil, err
+		}
+	}
+	if transform != nil {
+		if err := cfg.UseTransform(*transform); err != nil {
 			desktop.ConfigError(err, desktopNotify)
 			return nil, err
 		}

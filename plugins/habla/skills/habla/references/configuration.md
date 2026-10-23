@@ -145,7 +145,7 @@ capabilities from these examples; check current provider documentation or test o
 - `language` (in an stt provider) absent or `""` means automatic detection. `languages` lists tray language
   choices in addition to Auto. Gemini STT does not send the language hint.
 - `transform` (in an stt provider) absent or `""` means no transform. `"none"` is not a sentinel; it would be a named
-  definition.
+  definition. `habla listen --transform NAME` uses another one for one run without writing the file (`""`: none).
 - `[stt.transforms.<name>]` requires a nonempty `prompt`, which may span lines with `"""`. Optional `model`
   overrides the active llm provider's `model`; endpoint and credentials always come from `[llm]`. The selected
   transform name must exist, even when LLM is not configured. Transforms are shared by all stt providers.

@@ -964,10 +964,32 @@ func TestProviderFlagPicksTheSTTProvider(t *testing.T) {
 	}
 }
 
+func TestTransformFlagPicksTheTransform(t *testing.T) {
+	_, g, _ := setup(t, testenv.DefaultReplies, conf)
+	recorded(t, "failed.wav")
+	if code := Main([]string{"--retry", "--transform", "english"}); code != 0 {
+		t.Fatal(code)
+	}
+	if p := g.Paths(); len(p) != 2 || !strings.Contains(string(g.Body(1)), "Translate to English.") {
+		t.Fatalf("the transform was not english: %q\n%s", p, g.Body(1))
+	}
+	recorded(t, "failed.wav")
+	if code := Main([]string{"--retry", "--transform", ""}); code != 0 {
+		t.Fatal(code)
+	}
+	if p := g.Paths(); len(p) != 3 {
+		t.Fatalf("--transform \"\" still transformed: %q", p)
+	}
+	recorded(t, "failed.wav")
+	if code := Main([]string{"--retry", "--transform", "nope"}); code != 1 {
+		t.Fatalf("unknown transform: exit %d", code)
+	}
+}
+
 func TestStartPassesTheProviderToTheBackgroundSession(t *testing.T) {
 	e, g, _ := setup(t, testenv.DefaultReplies, conf)
 	e.WriteConfig(t, g, conf+altSTT+"endpoint = \""+g.URL+"/alt\"\n")
-	if code := Main([]string{"--start", "--provider", "alt"}); code != 0 {
+	if code := Main([]string{"--start", "--provider", "alt", "--transform", ""}); code != 0 {
 		t.Fatal(code)
 	}
 	recording(t)
@@ -976,7 +998,7 @@ func TestStartPassesTheProviderToTheBackgroundSession(t *testing.T) {
 		t.Fatal(code)
 	}
 	testenv.WaitFor(t, "the background recording to finish", func() bool { return !rundir.Alive(pid) })
-	if p := g.Paths(); len(p) == 0 || !strings.HasPrefix(p[0], "/v1/alt/") {
-		t.Fatalf("STT request did not use the alt provider: %q", g.Paths())
+	if p := g.Paths(); len(p) != 1 || !strings.HasPrefix(p[0], "/v1/alt/") {
+		t.Fatalf("want one STT request to the alt provider and no transform: %q", g.Paths())
 	}
 }

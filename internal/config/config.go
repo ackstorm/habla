@@ -666,6 +666,16 @@ func (c *Config) UseStyle(service, name string) error {
 	return nil
 }
 
+// UseTransform makes name the stt transform for this run (--transform); "" applies none. config.toml is not written.
+func (c *Config) UseTransform(name string) error {
+	if _, ok := c.Transform[name]; !ok && name != "" {
+		names := strings.Join(slices.Sorted(maps.Keys(c.Transform)), " | ")
+		return fmt.Errorf("--transform %s: expected one of %s, or \"\" for no transform", name, names)
+	}
+	c.STT.Transform = name
+	return nil
+}
+
 func (c *Config) TransformModel(name string) string {
 	if m := c.Transform[name].Model; m != "" {
 		return m

@@ -5,6 +5,16 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Added
+
+- `habla listen --transform NAME` picks a `[stt.transforms.*]` for one run; `--transform ""` turns the provider's
+  transform off.
+
+### Changed
+
+- The installer restarts a running tray after an upgrade, warns about a missing API key only on a first install (no
+  config yet), and no longer checks for the pre-0.1.0 `active` key.
+
 ## [0.1.4] - 2026-10-23
 
 ### Fixed

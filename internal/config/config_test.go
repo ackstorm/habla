@@ -483,6 +483,24 @@ func TestUseStyleOverridesTheProvidersStyle(t *testing.T) {
 	}
 }
 
+func TestUseTransformOverridesTheProvidersTransform(t *testing.T) {
+	setup(t)
+	write(t, Path(), DefaultTOML)
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.UseTransform("english"); err != nil || c.STT.Transform != "english" {
+		t.Fatalf("english: %v %q", err, c.STT.Transform)
+	}
+	if err := c.UseTransform(""); err != nil || c.STT.Transform != "" {
+		t.Fatalf("no transform: %v %q", err, c.STT.Transform)
+	}
+	if err := c.UseTransform("nope"); err == nil || !strings.Contains(err.Error(), "| punctuation, or") {
+		t.Fatalf("unknown transform: %v", err)
+	}
+}
+
 func TestActiveProvider(t *testing.T) {
 	one := "[stt.providers.solo]\nendpoint = \"https://a/v1\"\napi_key = \"env:A\"\nmodel = \"m\"\n"
 	if c, err := parse(one); err != nil || c.Providers["stt"].Active != "solo" || c.STT.Model != "m" {

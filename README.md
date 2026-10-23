@@ -60,6 +60,7 @@ The installer warns about what is missing (Debian/Ubuntu package names):
     habla listen              # in a terminal: Enter stops and copies; Esc or Ctrl+C discards
     habla listen --paste      # ...and paste it into the focused window
     habla listen --paste_enter  # ...paste it, then press Enter
+    habla listen --transform english  # ...with another [stt.transforms.*] for this run ("": none)
     habla tray                # tray icon + hold-to-talk hotkey (Super+Space)
     habla say "Hello"         # speak
     habla live --context notes.txt  # experimental spoken conversation about a text file
@@ -68,7 +69,8 @@ The installer warns about what is missing (Debian/Ubuntu package names):
 
 `habla listen` also takes `--start`, `--stop`, `--toggle`, `--cancel`, `--retry`, `--send` and `--status`, for key bindings.
 `listen`, `say` and `live` take `--provider NAME` to use another configured provider for one run; `say` and `live`
-also take `--style NAME` (a `[styles.*]` name, or `""` for none) to override the provider's style for one run.
+also take `--style NAME` (a `[styles.*]` name, or `""` for none) to override the provider's style for one run, and
+`listen` takes `--transform NAME` (a `[stt.transforms.*]` name, or `""` for none) to override its transform.
 
 ## Configuration
 
