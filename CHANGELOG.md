@@ -5,6 +5,8 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-10-23
+
 ### Added
 
 - `habla listen --transform NAME` picks a `[stt.transforms.*]` for one run; `--transform ""` turns the provider's
@@ -78,7 +80,8 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 - `habla` skill for Claude Code and Codex: configuration and spoken replies via `habla say`.
 - One static binary (amd64, arm64) installed by `install.sh` with checksum verification and tray autostart.
 
-[Unreleased]: https://github.com/ackstorm/habla/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/ackstorm/habla/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/ackstorm/habla/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/ackstorm/habla/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/ackstorm/habla/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/ackstorm/habla/compare/v0.1.1...v0.1.2
