@@ -1,6 +1,6 @@
 {
   "name": "habla",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Configure Habla through its TOML file and speak to the user out loud with habla say.",
   "author": { "name": "Habla" }
 }
