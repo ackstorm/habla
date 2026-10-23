@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -41,6 +42,7 @@ func Main(args []string) int {
 	fs := flag.NewFlagSet("habla tray", flag.ContinueOnError)
 	install := fs.Bool("install-autostart", false, "start the tray at login, and install its icons and desktop entry")
 	logLevel := fs.String("log", "", "log at `LEVEL` (error, warn, info, debug) for this run and its listen runs")
+	foreground := fs.Bool("foreground", false, "stay attached to the terminal (the default starts the tray in the background)")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -52,7 +54,7 @@ func Main(args []string) int {
 		return 2
 	}
 	if fs.NArg() > 0 {
-		fmt.Fprintln(os.Stderr, "usage: habla tray [--install-autostart]")
+		fmt.Fprintln(os.Stderr, "usage: habla tray [--foreground] [--install-autostart]")
 		return 2
 	}
 	if *install {
@@ -73,7 +75,12 @@ func Main(args []string) int {
 		fmt.Fprintln(os.Stderr, "Habla tray is already running")
 		return 1
 	}
+	if !*foreground {
+		lock.Close() // the background tray takes it
+		return startBackground(args)
+	}
 	defer lock.Close()
+	ready := readyPipe()
 	if err := gtk.Load(); err != nil {
 		fmt.Fprintln(os.Stderr, "habla tray:", err)
 		return 1
@@ -87,6 +94,10 @@ func Main(args []string) int {
 		fmt.Fprintln(os.Stderr, "habla tray:", err)
 		return 1
 	}
+	if ready != nil {
+		fmt.Fprintf(ready, "Habla tray started (pid %d)", os.Getpid())
+		ready.Close()
+	}
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	go func() { <-quit; gtk.Idle(gtk.MainQuit) }()
@@ -96,6 +107,52 @@ func Main(args []string) int {
 	}
 	return 0
 }
+
+// readyEnv marks the background tray: fd 3 is the pipe to the `habla tray` that started it.
+const readyEnv = "HABLA_TRAY_READY"
+
+// readyPipe is fd 3 in the background tray, nil otherwise. The listen runs the tray starts inherit neither.
+func readyPipe() *os.File {
+	if os.Getenv(readyEnv) == "" {
+		return nil
+	}
+	os.Unsetenv(readyEnv)
+	syscall.CloseOnExec(3)
+	return os.NewFile(3, "ready")
+}
+
+// startBackground runs `habla tray --foreground` in a session of its own, with no terminal, and returns once it shows
+// its icon, or has failed (its output is in habla.log).
+func startBackground(args []string) int {
+	r, w, err := os.Pipe()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "habla tray:", err)
+		return 1
+	}
+	defer r.Close()
+	cmd := exec.Command(HablaPath(), append([]string{"tray", "--foreground"}, args...)...) // stdin, stdout and stderr: /dev/null
+	cmd.Env = append(os.Environ(), readyEnv+"=1")
+	cmd.ExtraFiles = []*os.File{w} // fd 3 in the child
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	err = cmd.Start()
+	w.Close()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "habla tray:", err)
+		return 1
+	}
+	cmd.Process.Release()
+	r.SetReadDeadline(time.Now().Add(startWait))
+	message, _ := io.ReadAll(r)
+	if len(message) == 0 {
+		fmt.Fprintln(os.Stderr, "habla tray: it did not start; see "+logs.Path())
+		return 1
+	}
+	fmt.Println(string(message))
+	return 0
+}
+
+// startWait bounds the wait for the background tray (GTK, the hotkey grab, the indicator).
+const startWait = 15 * time.Second
 
 // installAutostart writes the autostart entry, the icons into ~/.local/share/icons and the portal's desktop entry.
 func installAutostart() int {

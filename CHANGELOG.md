@@ -5,6 +5,13 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Changed
+
+- `habla tray` starts the tray in the background (its own session, no terminal) and returns once the icon is up; it
+  still refuses to start a second tray. `habla tray --foreground` keeps it attached to the terminal, and the autostart
+  entry uses it (`habla tray --install-autostart`, run by the installer, rewrites the entry). The installer restarts
+  the tray this way on an upgrade.
+
 ## [0.1.6] - 2026-10-23
 
 ### Changed

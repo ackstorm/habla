@@ -146,7 +146,11 @@ it is saved, so *Edit config…* applies at once (except `hotkey`, which needs a
 ### Tray
 
     habla tray                        # tray icon, and the hold-to-talk hotkey on X11, KDE and GNOME
+    habla tray --foreground           # the same, attached to the terminal (autostart runs this)
     habla tray --install-autostart    # start it at login (the installer already did)
+
+`habla tray` starts the tray in the background, in a session of its own, and returns once its icon is up; with a tray
+already running it says so and exits 1. Its output goes to the log. Upgrading with the installer restarts it.
 
 The icon shows the state: a microphone when idle, a red square while recording (with the elapsed time, where the
 panel shows labels), amber while transcribing, a red microphone after a failed transcription. Middle-click starts or
@@ -169,7 +173,8 @@ sway, Hyprland) and `libgtk-layer-shell0`; on GNOME under Wayland a *Listening* 
 
 GNOME shows tray icons only with the *AppIndicator and KStatusNotifierItem Support* extension (on by default on
 Ubuntu, not on Debian or Fedora). Without it dictation keeps working with the hotkey. On sway and Hyprland start the
-tray from the compositor config instead of autostart: `exec habla tray` (sway), `exec-once = habla tray` (Hyprland).
+tray from the compositor config instead of autostart: `exec habla tray --foreground` (sway),
+`exec-once = habla tray --foreground` (Hyprland).
 
 ### Hotkey
 

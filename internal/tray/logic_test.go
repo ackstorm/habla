@@ -232,7 +232,7 @@ func TestInstallAutostart(t *testing.T) {
 	data, _ := os.ReadFile(path)
 	text := string(data)
 	if !strings.HasPrefix(text, "[Desktop Entry]\n") || !strings.Contains(text, "\nType=Application\n") ||
-		!strings.Contains(text, "\nExec="+HablaPath()+" tray\n") {
+		!strings.Contains(text, "\nExec="+HablaPath()+" tray --foreground\n") {
 		t.Errorf("autostart = %s", text)
 	}
 }
@@ -250,7 +250,7 @@ func TestInstallDesktopEntry(t *testing.T) {
 	data, _ := os.ReadFile(path)
 	text := string(data)
 	if !strings.HasPrefix(text, "[Desktop Entry]\n") || !strings.Contains(text, "\nName=Habla\n") ||
-		!strings.Contains(text, "\nExec="+HablaPath()+" tray\n") || strings.Contains(text, "NoDisplay") {
+		!strings.Contains(text, "\nExec="+HablaPath()+" tray --foreground\n") || strings.Contains(text, "NoDisplay") {
 		t.Errorf("desktop entry = %s", text)
 	}
 	if again, err := InstallDesktopEntry(); err != nil || again != path { // rewritten on every start

@@ -8,6 +8,10 @@
   `set_menu`: a target in the other menu walks up to an unattached GtkMenu and calls `gtk_widget_get_parent(NULL)`.
   So the target is cleared (0) before the swap and set after it.
 - `startTray` fails any GUI test whose tray output has a `-CRITICAL **` line.
+- GUI tests that release the hotkey at once wait for 300 ms of audio first (`recordedEnough`): shorter is a tap and
+  never reaches `busy`. `idle()` (no `listen.pid`) comes before copying and pasting: wait for the session PID to exit
+  before the test ends, or its last writes race `t.TempDir`'s cleanup.
+- `habla tray` without `--foreground` runs the tray in its own session (`TestTrayStartsInTheBackgroundGUI` kills it by PID).
 - `startTray`'s `stop` waits for the tray's whole process group, not just `cmd`: `dbus-run-session` (private bus)
   exits on SIGTERM without waiting for `habla tray` and its `dbus-daemon`, so a still-running tray wrote into the
   test's directories while `t.TempDir` removed them (`RemoveAll … directory not empty`, flaky on CI only).

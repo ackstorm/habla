@@ -29,7 +29,8 @@ Push-to-dictate for the Linux desktop through OpenAI-compatible, Gemini or Eleve
   POPUP placed by `PlacePill` on the active window's monitor, a layer-shell overlay, or (Wayland without layer-shell)
   the `notice` (`desktop.Critical` → `CloseNotification`).
 - `internal/tray` (GTK side): `tray.go` `Main` (`--install-autostart` = autostart + portal entry + icons in
-  `~/.local/share/icons`; else lock → `gtk.Load` → indicator, menu, `refresh` from `rundir.ReadState` + `config.Load`,
+  `~/.local/share/icons`; without `--foreground`: lock check → `startBackground` re-runs `tray --foreground` with
+  Setsid and waits (15 s) for `Habla tray started (pid N)` on fd 3 (`HABLA_TRAY_READY`, written after `newTray`); else lock → `gtk.Load` → indicator, menu, `refresh` from `rundir.ReadState` + `config.Load`,
   `habla listen <flag>` one at a time, reaped by a goroutine → `gtk.Idle`), `hotkey_x11.go` (xgb grab on its own
   connection, Esc via `GrabKeyboard` while held, `xembedTray`), `portal.go` (`runPortal`: KDE/GNOME Wayland
   GlobalShortcuts on its own session-bus connection, `Register` → `CreateSession` → `BindShortcuts` → `Hold`; one

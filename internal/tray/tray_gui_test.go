@@ -14,10 +14,12 @@ import (
 	"time"
 
 	"github.com/ackstorm/habla/internal/desktop"
+	"github.com/ackstorm/habla/internal/logs"
 	"github.com/ackstorm/habla/internal/rundir"
 	"github.com/ackstorm/habla/internal/testenv"
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
+	"golang.org/x/sys/unix"
 )
 
 // Looked up before any test replaces PATH with fakes.
@@ -95,9 +97,9 @@ func startTray(t *testing.T, e *testenv.Env, privateBus bool) (log string, stop 
 		t.Fatal(err)
 	}
 	defer f.Close()
-	cmd := exec.Command(filepath.Join(e.Bin, "habla"), "tray")
+	cmd := exec.Command(filepath.Join(e.Bin, "habla"), "tray", "--foreground")
 	if privateBus {
-		cmd = exec.Command(dbusSession, "--dbus-daemon="+dbusDaemon, "--", filepath.Join(e.Bin, "habla"), "tray")
+		cmd = exec.Command(dbusSession, "--dbus-daemon="+dbusDaemon, "--", filepath.Join(e.Bin, "habla"), "tray", "--foreground")
 	}
 	cmd.Stdout, cmd.Stderr = f, f
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -157,7 +159,16 @@ func xdo(t *testing.T, args ...string) {
 }
 
 func recording() bool { return rundir.ReadState() == "recording" }
-func idle() bool      { return rundir.RunningPID(rundir.Listen) == 0 }
+
+// recordedEnough waits for 300 ms of audio (listen.minRecording): a shorter recording is a tap and sends nothing.
+func recordedEnough(t *testing.T) {
+	t.Helper()
+	testenv.WaitFor(t, "300 ms of audio", func() bool {
+		info, err := os.Stat(filepath.Join(rundir.Dir(), "current.wav"))
+		return err == nil && info.Size() >= 44+9600
+	})
+}
+func idle() bool { return rundir.RunningPID(rundir.Listen) == 0 }
 
 func TestTrayHoldToTalkGUI(t *testing.T) {
 	e, g := guiEnv(t, "")
@@ -198,6 +209,42 @@ func TestTrayHoldToTalkGUI(t *testing.T) {
 	}
 }
 
+func TestTrayStartsInTheBackgroundGUI(t *testing.T) {
+	e, _ := guiEnv(t, "")
+	fakeBus(t, e, "none")
+	habla := filepath.Join(e.Bin, "habla")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, habla, "tray").CombinedOutput()
+	var pid int
+	if _, scanErr := fmt.Sscanf(string(out), "Habla tray started (pid %d)", &pid); err != nil || scanErr != nil {
+		t.Fatalf("habla tray: %v, %q", err, out)
+	}
+	t.Cleanup(func() { // the background tray is in a session of its own, outside any test process group
+		syscall.Kill(pid, syscall.SIGTERM)
+		for i := 0; syscall.Kill(pid, 0) == nil; i++ {
+			if i == 50 {
+				syscall.Kill(pid, syscall.SIGKILL)
+				t.Error("the background tray outlived SIGTERM")
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	})
+	if sid, _ := unix.Getsid(pid); sid != pid {
+		t.Errorf("the background tray's session is %d, want its own (%d)", sid, pid)
+	}
+	out, err = exec.CommandContext(ctx, habla, "tray").CombinedOutput()
+	if code := exitCode(err); code != 1 || !strings.Contains(string(out), "Habla tray is already running") {
+		t.Errorf("second habla tray: exit %d, %q", code, out)
+	}
+	xdo(t, "keydown", "super+space") // the background tray grabbed the hotkey
+	testenv.WaitFor(t, "recording", recording)
+	recordedEnough(t)
+	xdo(t, "keyup", "super+space")
+	testenv.WaitFor(t, "Hola. copied", func() bool { return slices.Equal(e.Lines("copied"), []string{"Hola."}) })
+}
+
 func TestTrayEnterWhileBusySendsGUI(t *testing.T) {
 	e, _ := guiEnv(t, "")
 	r := testenv.DefaultReplies
@@ -211,8 +258,10 @@ func TestTrayEnterWhileBusySendsGUI(t *testing.T) {
 
 	xdo(t, "keydown", "super+Return")
 	testenv.WaitFor(t, "recording", recording)
+	recordedEnough(t)
 	xdo(t, "keyup", "super+Return")
 	testenv.WaitFor(t, "transcribing", func() bool { return rundir.ReadState() == "busy" })
+	session := rundir.RunningPID(rundir.Listen)
 	mark := filepath.Join(rundir.Dir(), "send")
 	for _, key := range []string{"Return", "KP_Enter"} {
 		testenv.WaitFor(t, key+" while busy to leave the send mark", func() bool {
@@ -232,8 +281,11 @@ func TestTrayEnterWhileBusySendsGUI(t *testing.T) {
 	release()
 	testenv.WaitFor(t, "Hola. copied", func() bool { return slices.Equal(e.Lines("copied"), []string{"Hola."}) })
 	testenv.WaitFor(t, "idle", idle)
-	if got := keyboardGrab(t); got != xproto.GrabStatusSuccess {
-		t.Errorf("keyboard grab after the paste = %d, want Success: the focus lock outlived the dictation", got)
+	// listen.pid goes before copying, so the lock may still be held here: it must go once the paste starts.
+	testenv.WaitFor(t, "the focus lock to end", func() bool { return keyboardGrab(t) == xproto.GrabStatusSuccess })
+	testenv.WaitFor(t, "the session to finish delivering", func() bool { return !rundir.Alive(session) })
+	if data, _ := os.ReadFile(logs.Path()); strings.Contains(string(data), "another app holds the keyboard") {
+		t.Errorf("the paste waited for the focus lock:\n%s", data)
 	}
 	if data, _ := os.ReadFile(log); t.Failed() {
 		t.Logf("tray output:\n%s", data)
@@ -252,6 +304,7 @@ func TestTrayEscCancelsDuringTheFocusLockGUI(t *testing.T) {
 
 	xdo(t, "keydown", "super+space")
 	testenv.WaitFor(t, "recording", recording)
+	recordedEnough(t)
 	xdo(t, "keyup", "super+space")
 	testenv.WaitFor(t, "transcribing", func() bool { return rundir.ReadState() == "busy" })
 	testenv.WaitFor(t, "the focus lock after Enter", func() bool {

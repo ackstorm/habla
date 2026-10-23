@@ -83,8 +83,7 @@ restart_tray() {
 	elif [ -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
 		echo "Stopped the old tray; start the new one from your desktop session: habla tray"
 	else
-		nohup "$DIR/habla" tray </dev/null >/dev/null 2>&1 &
-		echo "Restarted the tray."
+		"$DIR/habla" tray || warn "the new tray did not start; run habla tray"
 	fi
 }
 
