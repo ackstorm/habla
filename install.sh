@@ -31,6 +31,10 @@ main() {
 	[ -n "$want" ] || die "no checksum for $bin in SHA256SUMS"
 	(cd "$tmp" && echo "$want" | sha256sum -c - >/dev/null 2>&1) || die "checksum mismatch for $bin; nothing installed"
 
+	config=${XDG_CONFIG_HOME:-$HOME/.config}/habla/config.toml
+	fresh=yes # no config yet: the first habla run below writes the default one
+	[ ! -e "$config" ] || fresh=
+
 	mkdir -p "$DIR"
 	chmod 0755 "$tmp/$bin"
 	mv -f "$tmp/$bin" "$DIR/habla.new"
@@ -47,18 +51,40 @@ main() {
 	esac
 
 	check_deps
-
-	if grep -q '^[[:space:]]*active[[:space:]]*=' "$HOME/.config/habla/config.toml" 2>/dev/null; then
-		warn "$HOME/.config/habla/config.toml uses the v2 key 'active': rename it to 'preset' (and the value 'off' to 'none')"
+	if [ -n "$fresh" ] && [ -z "${OPENAI_API_KEY:-}" ]; then
+		warn "no API key: set OPENAI_API_KEY or change api_key in $config"
 	fi
 
 	cat <<'N'
 
 Next steps:
+  habla tray               tray icon, hold Super+Space to dictate (starts at login)
   habla listen             dictate in a terminal (Enter stops and copies; Esc or Ctrl+C discards)
-  habla tray               tray icon, hold Super+Space to dictate
-Log out and in (or run habla tray) to start the tray. Docs: https://github.com/ackstorm/habla
 N
+	restart_tray || echo "Log out and in, or run habla tray, to start the tray."
+	echo "Docs: https://github.com/ackstorm/habla"
+}
+
+# restart_tray restarts a running tray, which still runs the old binary; false when none runs.
+restart_tray() {
+	have pgrep || return 1
+	pids=$(pgrep -u "$(id -u)" -a -x habla | awk '$3 == "tray" { print $1 }') || true
+	[ -n "$pids" ] || return 1
+	kill $pids 2>/dev/null || true
+	for i in $(seq 1 50); do
+		alive=
+		for pid in $pids; do kill -0 "$pid" 2>/dev/null && alive=yes; done
+		[ -n "$alive" ] || break
+		sleep 0.1
+	done
+	if [ -n "$alive" ]; then
+		warn "the running tray did not stop; restart it yourself"
+	elif [ -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
+		echo "Stopped the old tray; start the new one from your desktop session: habla tray"
+	else
+		nohup "$DIR/habla" tray </dev/null >/dev/null 2>&1 &
+		echo "Restarted the tray."
+	fi
 }
 
 fetch() { # fetch NAME: download $URL/NAME into $tmp/NAME
@@ -86,7 +112,6 @@ check_deps() {
 		"$ldc" -p 2>/dev/null | grep -q libayatana-appindicator3 || warn "tray icon library missing: sudo apt install libayatana-appindicator3-1"
 		"$ldc" -p 2>/dev/null | grep -q libgtk-layer-shell || echo "optional: sudo apt install libgtk-layer-shell0 (recording pill on KDE, sway, Hyprland)"
 	fi
-	[ -n "${OPENAI_API_KEY:-}" ] || warn "no API key: set OPENAI_API_KEY or change api_key in ~/.config/habla/config.toml"
 }
 
 main "$@"
