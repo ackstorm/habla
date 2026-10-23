@@ -70,8 +70,9 @@ restart_tray() {
 	have pgrep || return 1
 	pids=$(pgrep -u "$(id -u)" -a -x habla | awk '$3 == "tray" { print $1 }') || true
 	[ -n "$pids" ] || return 1
+	# shellcheck disable=SC2086 # one argument per PID
 	kill $pids 2>/dev/null || true
-	for i in $(seq 1 50); do
+	for _ in $(seq 1 50); do
 		alive=
 		for pid in $pids; do kill -0 "$pid" 2>/dev/null && alive=yes; done
 		[ -n "$alive" ] || break
