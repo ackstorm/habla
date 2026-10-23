@@ -114,9 +114,9 @@ is no transform, without `[tts]` `habla say` exits with *TTS is not configured*.
 | `endpoint`, `api_key`, `model` | all | `api_key` is `env:VARIABLE` or `cmd:COMMAND` |
 | `api` | stt, llm, tts | `openai` (default), `gemini`, or `elevenlabs` (tts only) |
 | `auth_header`, `auth_scheme` | stt, llm, tts | header name; `bearer` or `raw` |
-| `models` | stt, llm, tts | list for the tray's model submenu |
-| `voice`, `voices` | tts, live | base voice and the tray's choices |
-| `language`, `languages`, `transform` | stt | `""` = auto; the tray's choices; a `[stt.transforms.*]` name |
+| `models` | stt, llm, tts | accepted, unused for now (the tray no longer lists models) |
+| `voice`, `voices` | tts, live | base voice; `Name=ID` names for `voice` |
+| `language`, `languages`, `transform` | stt | `""` = auto; accepted, unused for now; a `[stt.transforms.*]` name |
 | `instructions_mode`, `style` | tts, live | how a shared `[styles.<name>]` is applied (see Speak) |
 
 Transforms are `[stt.transforms.<name>]` tables with a required `prompt` (multi-line `"""` strings allowed) and an
@@ -130,10 +130,11 @@ latency.
 
 **ElevenLabs** speaks for `habla say` only (`api = "elevenlabs"` in a `[tts.providers.*]` table; the default config has
 an inactive entry reading `$ELEVENLABS_API_KEY`). It takes no `instructions_mode` (pick an accent with the voice) and is
-rejected in `stt` and `llm`. A `voices` list may use `"Name=ID"` entries: the tray shows the name, `voice` can be the
-name or the ID, and the request carries the ID.
+rejected in `stt` and `llm`. A `voices` list may use `"Name=ID"` entries: `voice` can be the name or the ID, and the
+request carries the ID.
 
-**Tray choices** (provider, *Model*, *Language*, *Transform*, voice, *Also paste automatically*, *And press Enter*) are written into
+**Tray choices** (only what dictation uses: *Transform*, *STT provider* and *LLM provider* with two or more
+providers, *Also paste automatically*, *And press Enter*) are written into
 `config.toml`, keeping its other lines and comments; *None* writes `transform = ""`. The tray reloads the file whenever
 it is saved, so *Edit config…* applies at once (except `hotkey`, which needs a tray restart).
 

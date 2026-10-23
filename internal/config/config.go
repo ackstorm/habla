@@ -268,7 +268,7 @@ type Conn struct {
 	AuthScheme string   `toml:"auth_scheme"`
 	APIKey     string   `toml:"api_key"`
 	Model      string   `toml:"model"`
-	Models     []string `toml:"models"` // tray menu choices for model
+	Models     []string `toml:"models"` // ponytail: unused since the tray stopped listing models; drop with the config review
 }
 
 // Live is the single realtime WebSocket protocol; credentials use the same sources as Conn.
@@ -285,7 +285,7 @@ type Live struct {
 type STT struct {
 	Conn
 	Language  string   `toml:"language"`
-	Languages []string `toml:"languages"`
+	Languages []string `toml:"languages"` // ponytail: unused since the tray stopped listing languages; drop with the config review
 	Transform string   `toml:"transform"`
 }
 type Transform struct {

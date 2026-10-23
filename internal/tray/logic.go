@@ -3,7 +3,6 @@
 package tray
 
 import (
-	"cmp"
 	"embed"
 	"errors"
 	"fmt"
@@ -238,36 +237,19 @@ func PillHint(phase, key string, held bool) []Segment {
 	return []Segment{{"Release ", false}, {key, true}, {" to stop · ", false}, {"Esc", true}, {" discard", false}}
 }
 
-// MenuChoices are the menu's radio lists, keyed by their config.SaveChoice name. The transform presets come after
-// "none" in file order. A configured model, voice or language missing from its list is appended, active. A service
-// with two or more providers gets a <service>_provider list; tts_voice and live_voice list the active provider's voices.
+// MenuChoices are the menu's radio lists, keyed by their config.SaveChoice name: only what dictation uses. The
+// transform presets come after "none" in file order. stt and llm with two or more providers get a <service>_provider
+// list.
 func MenuChoices(c *config.Config) map[string][]Choice {
 	choices := map[string][]Choice{}
-	if c.STT != nil {
-		choices["stt_model"] = modelChoices(&c.STT.Conn)
-		languages := []Choice{{"Auto", "", c.STT.Language == ""}}
-		for _, l := range c.STT.Languages {
-			languages = append(languages, Choice{l, l, l == c.STT.Language})
+	if c.STT != nil && c.LLM != nil {
+		transform := []Choice{{"None: raw transcript", "", c.STT.Transform == ""}}
+		for _, name := range c.TransformOrder {
+			transform = append(transform, Choice{presetLabel(name), name, name == c.STT.Transform})
 		}
-		if !slices.ContainsFunc(languages, func(ch Choice) bool { return ch.Active }) {
-			languages = append(languages, Choice{c.STT.Language, c.STT.Language, true})
-		}
-		choices["language"] = languages
-		if c.LLM != nil {
-			transform := []Choice{{"None: raw transcript", "", c.STT.Transform == ""}}
-			for _, name := range c.TransformOrder {
-				transform = append(transform, Choice{presetLabel(name), name, name == c.STT.Transform})
-			}
-			choices["transform"] = transform
-		}
+		choices["transform"] = transform
 	}
-	if c.LLM != nil {
-		choices["llm_model"] = modelChoices(c.LLM)
-	}
-	if c.TTS != nil {
-		choices["tts_model"] = modelChoices(&c.TTS.Conn)
-	}
-	for _, service := range []string{"stt", "llm", "tts", "live"} {
+	for _, service := range []string{"stt", "llm"} {
 		p := c.Providers[service]
 		if len(p.Names) < 2 {
 			continue
@@ -278,45 +260,7 @@ func MenuChoices(c *config.Config) map[string][]Choice {
 		}
 		choices[service+"_provider"] = list
 	}
-	if c.TTS != nil {
-		choices["tts_voice"] = voiceChoices(c.TTS.Voices, c.TTS.Voice)
-	}
-	if c.Live != nil && (c.Live.Voice != "" || len(c.Live.Voices) > 0) {
-		choices["live_voice"] = voiceChoices(c.Live.Voices, c.Live.Voice)
-	}
 	return choices
-}
-
-// modelChoices lists a service's models, with its configured model appended, active, when the list lacks it.
-func modelChoices(conn *config.Conn) []Choice { return options(conn.Models, conn.Model) }
-
-// options lists choices, with current appended, active, when the list lacks it ("" is never appended).
-func options(list []string, current string) []Choice {
-	out := []Choice{}
-	for _, v := range list {
-		out = append(out, Choice{v, v, v == current})
-	}
-	if current != "" && !slices.Contains(list, current) {
-		out = append(out, Choice{current, current, true})
-	}
-	return out
-}
-
-// voiceChoices lists "Name=ID" entries by name (the ID when unnamed); the name, or the ID, is what is saved as voice.
-// An entry is active when its name or ID is current. A current voice in no entry is appended, active.
-func voiceChoices(voices []string, current string) []Choice {
-	out, found := []Choice{}, false
-	for _, e := range voices {
-		name, id := config.VoiceEntry(e)
-		name = cmp.Or(name, id)
-		active := current == name || current == id
-		found = found || active
-		out = append(out, Choice{name, name, active})
-	}
-	if current != "" && !found {
-		out = append(out, Choice{current, current, true})
-	}
-	return out
 }
 
 // presetLabel is Python's str.capitalize: first rune upper, the rest lower; "" stays "".

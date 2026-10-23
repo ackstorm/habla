@@ -42,15 +42,8 @@ func TestMenuChoicesFromTheDefaultConfig(t *testing.T) {
 	testenv.Setup(t)
 	got := MenuChoices(loaded(t))
 	want := map[string][]Choice{
-		"stt_model":    {{"gpt-4o-mini-transcribe", "gpt-4o-mini-transcribe", true}},
-		"llm_model":    {{"gpt-4o-mini", "gpt-4o-mini", true}},
-		"tts_model":    {{"gpt-4o-mini-tts", "gpt-4o-mini-tts", true}},
-		"language":     {{"Auto", "", true}, {"en", "en", false}},
 		"stt_provider": {{"openai", "openai", true}, {"gemini", "gemini", false}},
 		"llm_provider": {{"openai", "openai", true}, {"gemini", "gemini", false}},
-		"tts_provider": {{"openai", "openai", true}, {"gemini", "gemini", false}, {"elevenlabs", "elevenlabs", false}},
-		"tts_voice":    {{"alloy", "alloy", true}, {"ash", "ash", false}, {"coral", "coral", false}, {"nova", "nova", false}, {"sage", "sage", false}, {"marin", "marin", false}, {"cedar", "cedar", false}},
-		"live_voice":   {{"marin", "marin", true}, {"cedar", "cedar", false}},
 		"transform": {
 			{"None: raw transcript", "", false}, {"Clean", "clean", true}, {"Punctuation", "punctuation", false},
 			{"English", "english", false}, {"Commit", "commit", false},
@@ -64,12 +57,12 @@ func TestMenuChoicesFromTheDefaultConfig(t *testing.T) {
 func TestMenuChoicesOmitUnavailableSections(t *testing.T) {
 	c := config.Defaults()
 	c.LLM, c.TTS = nil, nil
-	if got := MenuChoices(c); got == nil || len(got["transform"]) != 0 || len(got["llm_model"]) != 0 || len(got["tts_model"]) != 0 {
-		t.Fatalf("choices without [llm] and [tts]: %v", got)
+	if got := MenuChoices(c); got == nil || len(got["transform"]) != 0 {
+		t.Fatalf("choices without [llm]: %v", got)
 	}
 	c.STT = nil
 	delete(c.Providers, "stt")
-	if got := MenuChoices(c); len(got["stt_model"]) != 0 || len(got["language"]) != 0 {
+	if got := MenuChoices(c); len(got["transform"]) != 0 {
 		t.Fatalf("STT choices without [stt]: %v", got)
 	}
 }
@@ -77,7 +70,7 @@ func TestMenuChoicesOmitUnavailableSections(t *testing.T) {
 func TestMenuChoicesWithoutSTTKeepOtherServices(t *testing.T) {
 	c := config.Defaults()
 	want := MenuChoices(c)
-	for _, key := range []string{"stt_model", "language", "transform", "stt_provider"} {
+	for _, key := range []string{"transform", "stt_provider"} {
 		delete(want, key)
 	}
 	c.STT = nil
@@ -87,49 +80,19 @@ func TestMenuChoicesWithoutSTTKeepOtherServices(t *testing.T) {
 	}
 }
 
-func TestMenuChoicesListProvidersAndVoices(t *testing.T) {
+func TestMenuChoicesListProviders(t *testing.T) {
 	c := config.Defaults()
 	if want := []Choice{{"openai", "openai", true}, {"gemini", "gemini", false}}; !reflect.DeepEqual(MenuChoices(c)["stt_provider"], want) {
 		t.Fatalf("stt_provider: %+v", MenuChoices(c)["stt_provider"])
 	}
-	if got := MenuChoices(c)["tts_voice"]; len(got) != 7 || got[0] != (Choice{"alloy", "alloy", true}) {
-		t.Fatalf("tts_voice: %+v", got)
-	}
-	if got := MenuChoices(c)["live_voice"]; len(got) != 2 || got[0] != (Choice{"marin", "marin", true}) {
-		t.Fatalf("live_voice: %+v", got)
+	for _, key := range []string{"language", "tts_provider", "live_provider"} { // the tray only dictates
+		if _, ok := MenuChoices(c)[key]; ok {
+			t.Fatalf("%s listed", key)
+		}
 	}
 	c.Providers["stt"] = config.Providers{Active: "solo", Names: []string{"solo"}}
 	if _, ok := MenuChoices(c)["stt_provider"]; ok {
 		t.Fatal("a single provider needs no list")
-	}
-	c.TTS.Voices, c.TTS.Voice = nil, "custom"
-	if want := []Choice{{"custom", "custom", true}}; !reflect.DeepEqual(MenuChoices(c)["tts_voice"], want) {
-		t.Fatalf("a voice missing from voices is listed: %+v", MenuChoices(c)["tts_voice"])
-	}
-	c.Live.Voices, c.Live.Voice = nil, ""
-	if _, ok := MenuChoices(c)["live_voice"]; ok {
-		t.Fatal("no live voice: no list")
-	}
-}
-
-func TestVoiceChoicesShowNamesAndSaveThem(t *testing.T) {
-	c := config.Defaults()
-	c.TTS.Voices, c.TTS.Voice = []string{"George=JB", "Alice=AL", "plain"}, "AL"
-	want := []Choice{{"George", "George", false}, {"Alice", "Alice", true}, {"plain", "plain", false}}
-	if got := MenuChoices(c)["tts_voice"]; !reflect.DeepEqual(got, want) {
-		t.Fatalf("active by ID: %+v", got)
-	}
-	c.TTS.Voice = "George"
-	if got := MenuChoices(c)["tts_voice"]; !got[0].Active || got[1].Active {
-		t.Fatalf("active by name: %+v", got)
-	}
-	c.Live.Voices, c.Live.Voice = []string{"Ana=A1"}, "A1"
-	if got := MenuChoices(c)["live_voice"]; !reflect.DeepEqual(got, []Choice{{"Ana", "Ana", true}}) {
-		t.Fatalf("live: %+v", got)
-	}
-	c.TTS.Voices, c.TTS.Voice = []string{"George=JB"}, "other"
-	if got := MenuChoices(c)["tts_voice"]; len(got) != 2 || got[1] != (Choice{"other", "other", true}) {
-		t.Fatalf("a voice missing from voices is listed: %+v", got)
 	}
 }
 
@@ -141,41 +104,11 @@ func TestPresetLabel(t *testing.T) {
 	}
 }
 
-func TestMenuChoicesIncludeCurrentConfigValuesMissingFromLists(t *testing.T) {
-	testenv.Setup(t)
-	if err := os.MkdirAll(filepath.Dir(config.Path()), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	text := testenv.Merge(config.DefaultTOML, "[stt.providers.openai]\nlanguage = \"fr\"\nmodels = [\"gpt-4o-mini-transcribe\", \"other\"]\nmodel = \"other\"\n")
-	text = strings.ReplaceAll(text, `"env:OPENAI_API_KEY"`, `"env:HABLA_API_KEY"`)
-	os.WriteFile(config.Path(), []byte(text), 0o644)
-	got := MenuChoices(loaded(t))
-	if want := []Choice{{"Auto", "", false}, {"en", "en", false}, {"fr", "fr", true}}; !reflect.DeepEqual(got["language"], want) {
-		t.Errorf("language = %v", got["language"])
-	}
-	if want := []Choice{{"gpt-4o-mini-transcribe", "gpt-4o-mini-transcribe", false}, {"other", "other", true}}; !reflect.DeepEqual(got["stt_model"], want) {
-		t.Errorf("stt_model = %v", got["stt_model"])
-	}
-}
-
-func TestModelChoicesWithoutAList(t *testing.T) {
-	if got, want := modelChoices(&config.Conn{Model: "m"}), []Choice{{"m", "m", true}}; !reflect.DeepEqual(got, want) {
-		t.Errorf("got %v", got)
-	}
-	if got, want := modelChoices(&config.Conn{Model: "b", Models: []string{"a", "b"}}), []Choice{{"a", "a", false}, {"b", "b", true}}; !reflect.DeepEqual(got, want) {
-		t.Errorf("got %v", got)
-	}
-}
-
 func TestMenuChoicesFollowSavedChoices(t *testing.T) {
 	testenv.Setup(t)
 	loaded(t)
-	config.SaveChoice("language", "en")
 	config.SaveChoice("transform", "")
 	got := MenuChoices(loaded(t))
-	if want := []Choice{{"Auto", "", false}, {"en", "en", true}}; !reflect.DeepEqual(got["language"], want) {
-		t.Errorf("language = %v", got["language"])
-	}
 	if want := (Choice{"None: raw transcript", "", true}); got["transform"][0] != want {
 		t.Errorf("transform[0] = %v", got["transform"][0])
 	}

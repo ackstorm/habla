@@ -5,6 +5,12 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Changed
+
+- The tray menu offers only what dictation uses: *Transform*, then *STT provider* and *LLM provider* (with two or
+  more providers). The language, model, voice, TTS and Live pickers are gone; `language` still applies from
+  config.toml, and `languages` and `models` are accepted but unused.
+
 ## [0.1.5] - 2026-10-23
 
 ### Added

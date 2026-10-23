@@ -318,18 +318,21 @@ func (t *tray) buildMenu(s *shown) (menu, toggle uintptr) {
 		t.command(menu, "Retry last failed", "--retry")
 	}
 	gtk.MenuShellAppend(menu, gtk.SeparatorMenuItemNew())
-	for _, r := range []struct{ key, title string }{
-		{"llm_provider", "LLM provider"}, {"llm_model", "LLM"}, {"stt_provider", "STT provider"}, {"stt_model", "STT"},
-		{"tts_provider", "TTS provider"}, {"tts_model", "TTS"}, {"tts_voice", "TTS voice"},
-		{"live_provider", "Live provider"}, {"live_voice", "Live voice"},
-		{"language", "Language"}, {"transform", "Transform"},
+	for _, group := range [][]struct{ key, title string }{ // quick choices, then the active providers
+		{{"transform", "Transform"}},
+		{{"stt_provider", "STT provider"}, {"llm_provider", "LLM provider"}},
 	} {
-		if len(s.choices[r.key]) == 0 {
-			continue
+		appended := false
+		for _, r := range group {
+			if len(s.choices[r.key]) > 0 {
+				gtk.MenuShellAppend(menu, t.radio(r.key, r.title, s.choices[r.key]))
+				appended = true
+			}
 		}
-		gtk.MenuShellAppend(menu, t.radio(r.key, r.title, s.choices[r.key]))
+		if appended {
+			gtk.MenuShellAppend(menu, gtk.SeparatorMenuItemNew())
+		}
 	}
-	gtk.MenuShellAppend(menu, gtk.SeparatorMenuItemNew())
 	paste := gtk.CheckMenuItemNewWithLabel("Also paste automatically")
 	gtk.CheckMenuItemSetActive(paste, s.paste)
 	gtk.Connect(paste, "toggled", func() { t.choose("paste", gtk.CheckMenuItemGetActive(paste)) })

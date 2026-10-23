@@ -43,7 +43,7 @@ to inspect configuration; it is shell code. Store credential references, never l
   LLM call to compensate for a speech model that does not support instructions.
 - Preserve recording, streaming, splitting, paste, and hotkey behavior unless the user asks to change them.
 
-Tray menu choices (each service's `provider`, the active provider's `model`, `language`, `transform`, `voice`, and `[tray] paste` / `paste_enter`) are written into `config.toml` itself;
+Tray menu choices (dictation only: `transform`, the stt and llm `provider`, and `[tray] paste` / `paste_enter`) are written into `config.toml` itself;
 there is no separate state file. The file is the only source of truth. `--provider NAME` on `habla listen`, `say` and `live` picks a provider for one run and is never saved; `habla listen --transform NAME` likewise picks a transform (`""`: none).
 
 ### Validate and hand back

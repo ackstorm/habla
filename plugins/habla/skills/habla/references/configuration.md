@@ -129,7 +129,7 @@ Every `[stt|llm|tts.providers.<name>]` requires `endpoint`, `api_key`, and `mode
 | `auth_scheme` | `bearer` (default) adds `Bearer `; `raw` sends the credential without a prefix. |
 | `api_key` | `env:VARIABLE` or `cmd:COMMAND`, with a nonempty suffix. No literal keys, empty fallback, or implicit inheritance. |
 | `model` | Exact model ID exposed by that endpoint. |
-| `models` | Optional list of model IDs for that provider's tray submenu; the submenu also shows `model` when the list lacks it, and only `model` without a list. Choosing one rewrites `model` of the active provider. |
+| `models` | Optional list of model IDs; accepted but unused for now (the tray menu no longer lists models). |
 
 OpenAI-compatible calls append `/audio/transcriptions`, `/chat/completions`, or `/audio/speech`, usually to a base
 ending in `/v1`. Native Gemini calls append `/models/<model>:generateContent`, for example to a base ending in
@@ -142,21 +142,21 @@ capabilities from these examples; check current provider documentation or test o
 
 ## Dictation and transform
 
-- `language` (in an stt provider) absent or `""` means automatic detection. `languages` lists tray language
-  choices in addition to Auto. Gemini STT does not send the language hint.
+- `language` (in an stt provider) absent or `""` means automatic detection. `languages` is accepted but unused for
+  now (the tray menu no longer lists languages). Gemini STT does not send the language hint.
 - `transform` (in an stt provider) absent or `""` means no transform. `"none"` is not a sentinel; it would be a named
   definition. `habla listen --transform NAME` uses another one for one run without writing the file (`""`: none).
 - `[stt.transforms.<name>]` requires a nonempty `prompt`, which may span lines with `"""`. Optional `model`
   overrides the active llm provider's `model`; endpoint and credentials always come from `[llm]`. The selected
   transform name must exist, even when LLM is not configured. Transforms are shared by all stt providers.
-- There is no `transform.preset` or `transform.prompts` key in this schema. A transform's own `model` wins over the tray's
-  llm `model` choice.
+- There is no `transform.preset` or `transform.prompts` key in this schema. A transform's own `model` wins over the active
+  llm provider's `model`.
 
 ## Voice and styles
 
 `voice` is required in every tts provider. It is the voice used with or without a style; styles never carry a
 voice. `format` is provider-dependent; native Gemini accepts only absent/empty or `"wav"` in this implementation.
-Do not assume other Gemini audio encodings work. `voices` lists the tray voice choices.
+Do not assume other Gemini audio encodings work. `voices` may name voices (`"Name=ID"`).
 
 A `voices` entry is `"ID"` or `"Name=ID"` (split at the first `=`); `voice` may be a name from `voices` or an ID. The
 tray lists and saves the name, and requests carry the ID.
@@ -255,8 +255,8 @@ numbers; thresholds longer than `general.max_seconds` simply cannot be reached d
 Existing configuration files are not rewritten: explicit split settings remain in effect, and missing keys
 inherit the defaults.
 
-The configuration uses XDG paths and is the only source of truth for preferences. The tray saves each service's `[<service>] provider`, writes the active
-provider's `model`, `voice`, `language` and `transform`, and `tray.paste` / `tray.paste_enter`, directly into that same TOML file, preserving
+The configuration uses XDG paths and is the only source of truth for preferences. The tray saves the stt and llm `provider`, writes the active stt
+provider's `transform`, and `tray.paste` / `tray.paste_enter`, directly into that same TOML file, preserving
 unrelated keys and comments. There is no separate tray-choice state file or override to clear. Empty transform means
 raw transcription; empty language means Auto. Runtime recording/delivery state is separate from configuration.
 
