@@ -5,6 +5,11 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Added
+
+- The tray also plays a short "pip" when Enter sends a dictation (paste, then Enter); `[tray] sound = false` mutes it
+  with the others.
+
 ## [0.1.8] - 2026-10-26
 
 ### Added

@@ -229,11 +229,11 @@ func newTray(cfg *config.Config) (*tray, error) {
 	return t, nil
 }
 
-// cues are the hotkey's two-note tones (tray.sound): rising "pin-pin" as it starts recording, falling "pon-pon" as it
-// stops, so a press that missed the hotkey is heard at once.
-var cues = map[string][]float64{"--start": {880, 1175}, "--stop": {587, 440}}
+// cues are the hotkey's tones (tray.sound): rising "pin-pin" as it starts recording, falling "pon-pon" as it stops,
+// so a press that missed the hotkey is heard at once, and one "pip" as Enter sends the dictation (paste + Enter).
+var cues = map[string][]float64{"--start": {880, 1175}, "--stop": {587, 440}, "--send": {1319}}
 
-// cueFile is where newTray writes the tone for flag: cue-start.wav, cue-stop.wav.
+// cueFile is where newTray writes the tone for flag: cue-start.wav, cue-stop.wav, cue-send.wav.
 func cueFile(flag string) string { return filepath.Join(rundir.Dir(), "cue"+flag[1:]+".wav") }
 
 // cue plays flag's tone when tray.sound is on, without waiting for it; with no player it stays silent.
