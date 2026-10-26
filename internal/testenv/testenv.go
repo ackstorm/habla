@@ -20,6 +20,10 @@ var fakes = map[string]func(args []string) int{}
 
 // Fake runs the fake tool named by os.Args[0] and exits. Call it first in TestMain.
 func Fake() {
+	if os.Getenv("HABLA_FAKE_SLEEP") != "" { // HablaProcess
+		time.Sleep(time.Minute)
+		os.Exit(0)
+	}
 	if run, ok := fakes[filepath.Base(os.Args[0])]; ok {
 		os.Exit(run(os.Args[1:]))
 	}
@@ -110,15 +114,21 @@ func WaitFor(t *testing.T, what string, cond func() bool) {
 	t.Fatalf("timed out waiting for %s", what)
 }
 
-// HablaProcess starts a process that rundir.Alive accepts (/bin/sleep through a link named habla); it is killed when
-// the test ends.
+// HablaProcess starts a process that rundir.Alive accepts (the test binary sleeping through a link named habla; its
+// TestMain must call Fake); it is killed when the test ends. Not /bin/sleep: uutils coreutils (Ubuntu 26.04) is one
+// binary that picks the tool by its link name, so "habla" exits at once.
 func HablaProcess(t *testing.T) *exec.Cmd {
 	t.Helper()
-	link := filepath.Join(t.TempDir(), "habla")
-	if err := os.Symlink("/bin/sleep", link); err != nil {
+	exe, err := os.Executable()
+	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(link, "60")
+	link := filepath.Join(t.TempDir(), "habla")
+	if err := os.Symlink(exe, link); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(link)
+	cmd.Env = append(os.Environ(), "HABLA_FAKE_SLEEP=1")
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
