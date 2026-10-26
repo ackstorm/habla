@@ -233,7 +233,7 @@ func TestContextAndMicrophoneStreamBeforeResponseCompletes(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer file.Close()
-	err = converse(ctx, c, mic, play, opening, io.MultiWriter(&transcript, file), io.Discard, nil)
+	err = converse(ctx, c, mic, play, opening, false, io.MultiWriter(&transcript, file), io.Discard, nil)
 	if problem := <-serverErr; problem != "" {
 		t.Fatal(problem)
 	}
@@ -273,7 +273,7 @@ func TestTranscriptWriteFailureStopsSessionWithoutLeakingContent(t *testing.T) {
 	}
 	mic, feed := io.Pipe()
 	defer feed.Close()
-	err = converse(ctx, c, mic, func(context.Context, io.Reader) error { return nil }, false, failedTranscript{}, io.Discard, nil)
+	err = converse(ctx, c, mic, func(context.Context, io.Reader) error { return nil }, false, false, failedTranscript{}, io.Discard, nil)
 	if err == nil || !strings.Contains(err.Error(), "transcript") || strings.Contains(err.Error(), "private-context") || strings.Contains(err.Error(), "token-value") {
 		t.Fatalf("unsafe or missing transcript error: %v", err)
 	}
@@ -302,7 +302,7 @@ func TestProtocolFailuresDoNotEchoPayloads(t *testing.T) {
 			defer c.Close()
 			mic, feed := io.Pipe()
 			defer feed.Close()
-			err = converse(ctx, c, mic, func(context.Context, io.Reader) error { return nil }, false, io.Discard, io.Discard, nil)
+			err = converse(ctx, c, mic, func(context.Context, io.Reader) error { return nil }, false, false, io.Discard, io.Discard, nil)
 			if err == nil || strings.Contains(err.Error(), "private-context") || strings.Contains(err.Error(), "test-token") {
 				t.Fatalf("unsafe or missing error: %v", err)
 			}
@@ -333,7 +333,7 @@ func TestCancelUnblocksCaptureAndPlayback(t *testing.T) {
 			close(playing)
 			<-ctx.Done()
 			return ctx.Err()
-		}, false, io.Discard, io.Discard, nil)
+		}, false, false, io.Discard, io.Discard, nil)
 	}()
 	select {
 	case <-playing:
@@ -401,7 +401,7 @@ func TestMicrophoneResumesOnlyAfterPlaybackDrains(t *testing.T) {
 		case <-ctx.Done():
 			return ctx.Err()
 		}
-	}, false, io.Discard, io.Discard, nil)
+	}, false, false, io.Discard, io.Discard, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -445,7 +445,7 @@ func TestAudioBurstWaitsForPlayback(t *testing.T) {
 					data, err := io.ReadAll(r)
 					played <- data
 					return err
-				}, false, io.Discard, io.Discard, nil)
+				}, false, false, io.Discard, io.Discard, nil)
 			}()
 			select {
 			case <-playing:
@@ -576,7 +576,7 @@ func TestToolCallRunsAndTheModelAnswersWithItsOutput(t *testing.T) {
 	}()
 	var transcript bytes.Buffer
 	err = converse(ctx, c, mic, func(ctx context.Context, r io.Reader) error { _, err := io.Copy(io.Discard, r); return err },
-		false, &transcript, io.Discard, files)
+		false, false, &transcript, io.Discard, files)
 	if problem := <-serverErr; problem != "" {
 		t.Fatal(problem)
 	}
@@ -588,5 +588,95 @@ func TestToolCallRunsAndTheModelAnswersWithItsOutput(t *testing.T) {
 	}
 	if want := "Tool: write_file notes/summary.md\nAssistant: Saved.\n"; transcript.String() != want {
 		t.Fatalf("transcript %q, want %q", transcript.String(), want)
+	}
+}
+
+func TestBargeInStopsPlaybackAndDropsTheInterruptedReply(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	serverErr := make(chan string, 1)
+	playing, interrupted := make(chan struct{}), make(chan struct{})
+	url := socket(t, func(c *websocket.Conn) {
+		var setup any
+		c.ReadJSON(&setup)
+		c.WriteJSON(map[string]any{"type": "response.created"})
+		// five seconds: still queued when the user speaks
+		c.WriteJSON(map[string]any{"type": "response.output_audio.delta", "delta": base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{1, 2}, 120000))})
+		var input map[string]any
+		if c.ReadJSON(&input) != nil || input["type"] != "input_audio_buffer.append" {
+			serverErr <- "microphone paused during the response"
+			return
+		}
+		go func() {
+			for {
+				if _, _, err := c.ReadMessage(); err != nil {
+					return
+				}
+			}
+		}()
+		select {
+		case <-playing:
+		case <-ctx.Done():
+			serverErr <- "playback did not start"
+			return
+		}
+		c.WriteJSON(map[string]any{"type": "input_audio_buffer.speech_started"})
+		select {
+		case <-interrupted:
+		case <-ctx.Done():
+			serverErr <- "speech did not stop playback"
+			return
+		}
+		c.WriteJSON(map[string]any{"type": "response.output_audio.delta", "delta": base64.StdEncoding.EncodeToString([]byte{7, 7})})
+		c.WriteJSON(map[string]any{"type": "response.done", "response": map[string]any{"status": "cancelled"}})
+		c.WriteJSON(map[string]any{"type": "response.created"})
+		c.WriteJSON(map[string]any{"type": "response.output_audio.delta", "delta": base64.StdEncoding.EncodeToString([]byte{3, 4, 5, 6})})
+		c.WriteJSON(map[string]any{"type": "response.done", "response": map[string]any{"status": "completed"}})
+		serverErr <- ""
+		<-ctx.Done()
+	})
+	c, _, err := connect(ctx, config.Live{Endpoint: url, Model: "test-model"}, "test-token", "", config.Delivery{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mic, feed := io.Pipe()
+	defer feed.Close()
+	go func() {
+		for {
+			if _, err := feed.Write(make([]byte, 960)); err != nil {
+				return
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}()
+	plays := 0
+	played := make(chan []byte, 1)
+	err = converse(ctx, c, mic, func(pctx context.Context, r io.Reader) error {
+		if plays++; plays == 1 {
+			close(playing)
+			<-pctx.Done()
+			if ctx.Err() == nil {
+				close(interrupted)
+			}
+			return pctx.Err()
+		}
+		data, err := io.ReadAll(r)
+		played <- data
+		cancel()
+		return err
+	}, false, true, io.Discard, io.Discard, nil)
+	if problem := <-serverErr; problem != "" {
+		t.Fatal(problem)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case data := <-played:
+		if !bytes.Equal(data, []byte{3, 4, 5, 6}) {
+			t.Fatalf("after the interruption played %d bytes, want only the new reply", len(data))
+		}
+	default:
+		t.Fatal("the reply after the interruption was not played")
 	}
 }

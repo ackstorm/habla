@@ -162,7 +162,7 @@ func Main(args []string) (code int) {
 				play := audioProcess(ctx, player)
 				play.Stdin = pcm
 				return play.Run()
-			}, opening, output, os.Stderr, files)
+			}, opening, cfg.Live.BargeIn, output, os.Stderr, files)
 			stop()
 			mic.Close()
 			cmd.Wait()

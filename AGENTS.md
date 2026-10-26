@@ -27,7 +27,10 @@ Push-to-dictate for the Linux desktop through OpenAI-compatible, Gemini or Eleve
   Gemini bridge applies no other, and passes tools only with LiteLLM's `gemini_live_defer_setup`); `converse` collects
   `function_call` items from `response.output_item.done`, and at `response.done` sends each `function_call_output`
   + one `response.create` (`followUp`: its `response.created` is not an overlap; the mic stays paused). The mic and
-  tool outputs share the socket through `send`. Live check: `HABLA_LIVE=1` + `HABLA_LIVE_REALTIME_URL`/`_MODEL` +
+  tool outputs share the socket through `send`. `barge_in`: the mic is never paused (except for the context opening);
+  `input_audio_buffer.speech_started` bumps `gen` (queued chunks of an older generation are dropped), cancels the
+  current player through `cut`, and sets `muted` until the next `response.created`; `response.done` `cancelled` is
+  accepted and drops its tool calls. No `conversation.item.truncate` yet. Live check: `HABLA_LIVE=1` + `HABLA_LIVE_REALTIME_URL`/`_MODEL` +
   `HABLA_API_KEY` → `TestRealtimeGatewayToolCall` (text in, no TTS).
 - `internal/say`: `habla say`. `config.TTS.Delivery` selects the style voice/instructions and warns if a style is inactive. One `gateway.Speak` request → `--out FILE`, or
   `say.wav` played by `pw-play`/`paplay` while holding `say.pid` (no `state`); SIGTERM (`--stop`) terminates the player, exit 0.

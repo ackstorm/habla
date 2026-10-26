@@ -157,8 +157,9 @@ func connect(ctx context.Context, cfg config.Live, key, background string, style
 }
 
 // converse owns mic and c until return. play must stop when its context is cancelled. A response that calls files'
-// tools gets their outputs and a follow-up response; the microphone stays paused until that one is done.
-func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play func(context.Context, io.Reader) error, awaitingContext bool, out, status io.Writer, files *tools) error {
+// tools gets their outputs and a follow-up response; the microphone stays paused until that one is done. bargeIn
+// keeps the microphone open instead: the server's speech_started stops playback and drops the rest of that reply.
+func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play func(context.Context, io.Reader) error, awaitingContext, bargeIn bool, out, status io.Writer, files *tools) error {
 	ctx, cancel := context.WithCancel(parent)
 	var wg sync.WaitGroup
 	defer func() { cancel(); c.Close(); mic.Close(); wg.Wait() }()
@@ -185,7 +186,19 @@ func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play
 	var paused atomic.Bool
 	paused.Store(awaitingContext)
 	// Keep ten seconds queued; a full queue slows socket reads until playback catches up.
-	playback := make(chan []byte, 500)
+	type chunk struct {
+		gen int64 // audio queued before the latest interruption is dropped
+		pcm []byte
+	}
+	queued := 500
+	if bargeIn {
+		// ponytail: a full queue also delays reading speech_started, so barge-in queues a minute (about 3 MB);
+		// replies longer than that interrupt late. Read the socket apart from queuing if that matters.
+		queued = 3000
+	}
+	playback := make(chan chunk, queued)
+	var gen atomic.Int64
+	var cut atomic.Value // the current player's context.CancelFunc
 	wg.Add(3)
 	go func() { defer wg.Done(); <-ctx.Done(); c.Close(); mic.Close() }()
 	go func() {
@@ -210,6 +223,8 @@ func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play
 		var pipe *io.PipeWriter
 		var done chan error
 		var closeOnCancel func() bool
+		var stopPlayer context.CancelFunc
+		var pipeGen int64
 		finish := func() error {
 			if pipe == nil {
 				return nil
@@ -217,7 +232,11 @@ func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play
 			pipe.Close()
 			err := <-done
 			closeOnCancel()
+			stopPlayer()
 			pipe = nil
+			if pipeGen != gen.Load() { // interrupted: the player was stopped
+				return nil
+			}
 			return err
 		}
 		defer finish()
@@ -225,7 +244,12 @@ func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play
 			select {
 			case <-ctx.Done():
 				return
-			case pcm := <-playback:
+			case next := <-playback:
+				pcm := next.pcm
+				if pipe != nil && pipeGen != gen.Load() {
+					stopPlayer()
+					finish()
+				}
 				if pcm == nil {
 					if err := finish(); err != nil {
 						fail(errors.New("Audio playback failed"))
@@ -235,14 +259,24 @@ func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play
 					fmt.Fprintln(status, "Listening… Ctrl+C ends the session.")
 					continue
 				}
+				if next.gen != gen.Load() {
+					continue
+				}
 				if pipe == nil {
 					r, w := io.Pipe()
-					pipe, done = w, make(chan error, 1)
-					closeOnCancel = context.AfterFunc(ctx, func() { r.CloseWithError(ctx.Err()) })
+					pipe, done, pipeGen = w, make(chan error, 1), next.gen
+					var pctx context.Context
+					pctx, stopPlayer = context.WithCancel(ctx)
+					cut.Store(stopPlayer)
+					closeOnCancel = context.AfterFunc(pctx, func() { r.CloseWithError(pctx.Err()) })
 					result := done
-					go func() { err := play(ctx, r); r.CloseWithError(err); result <- err }()
+					go func() { err := play(pctx, r); r.CloseWithError(err); result <- err }()
 				}
 				if _, err := pipe.Write(pcm); err != nil {
+					if pipeGen != gen.Load() {
+						finish()
+						continue
+					}
 					fail(errors.New("Audio playback failed"))
 					return
 				}
@@ -251,14 +285,20 @@ func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play
 	}()
 	queue := func(pcm []byte) bool {
 		select {
-		case playback <- pcm:
+		case playback <- chunk{gen.Load(), pcm}:
 			return true
 		case <-ctx.Done():
 			return false
 		}
 	}
+	responding := "Responding… microphone input paused."
+	if bargeIn {
+		responding = "Responding… speak to interrupt."
+	}
 	if awaitingContext {
 		fmt.Fprintln(status, "Sending context… microphone input paused.")
+	} else if bargeIn {
+		fmt.Fprintln(status, "Listening… Speak any time; Ctrl+C ends the session.")
 	} else {
 		fmt.Fprintln(status, "Listening… Speak between responses; Ctrl+C ends the session.")
 	}
@@ -266,6 +306,7 @@ func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play
 	audioBytes := 0
 	var calls []event // function calls of the current response
 	followUp := false // a response.create for tool outputs is pending: its response.created is not an overlap
+	muted := false    // the user interrupted: drop audio until the next response
 	for ctx.Err() == nil {
 		var e event
 		if err := c.ReadJSON(&e); err != nil {
@@ -278,23 +319,37 @@ func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play
 		case "error":
 			fail(errors.New("Realtime gateway rejected the session or request"))
 		case "response.created":
-			if paused.Swap(true) && !awaitingContext && !followUp {
+			muted = false
+			if !bargeIn && paused.Swap(true) && !awaitingContext && !followUp {
 				fail(errors.New("Overlapping responses are not supported"))
 				break
 			}
 			if !awaitingContext && !followUp {
-				fmt.Fprintln(status, "Responding… microphone input paused.")
+				fmt.Fprintln(status, responding)
 			}
 			followUp = false
+		case "input_audio_buffer.speech_started":
+			// The server cancels its response itself (server_vad's interrupt_response); this stops what is queued.
+			// ponytail: no conversation.item.truncate, so the model's history keeps the unheard rest of the reply;
+			// send it (played bytes / 48 = audio_end_ms) once a provider is confirmed to accept it.
+			if bargeIn {
+				gen.Add(1)
+				if stop, ok := cut.Load().(context.CancelFunc); ok {
+					stop()
+				}
+				muted = true
+			}
 		case "response.audio.delta", "response.output_audio.delta":
-			paused.Store(true)
+			if !bargeIn {
+				paused.Store(true)
+			}
 			pcm, err := base64.StdEncoding.DecodeString(e.Delta)
 			if err != nil || len(pcm) == 0 {
 				fail(errors.New("Realtime gateway sent invalid PCM audio"))
 				break
 			}
 			audioBytes += len(pcm)
-			for !awaitingContext && len(pcm) > 0 {
+			for !awaitingContext && !muted && len(pcm) > 0 {
 				n := min(frameBytes, len(pcm))
 				if !queue(pcm[:n]) {
 					break
@@ -319,7 +374,9 @@ func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play
 			}
 			write("%s", e.Delta)
 		case "response.done":
-			if e.Response.Status != "" && e.Response.Status != "completed" {
+			if e.Response.Status == "cancelled" { // interrupted: its tool calls are not run
+				calls = nil
+			} else if e.Response.Status != "" && e.Response.Status != "completed" {
 				fail(errors.New("Realtime response did not complete"))
 				break
 			}

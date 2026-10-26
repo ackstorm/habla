@@ -5,6 +5,12 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Added
+
+- `habla live` can be interrupted by voice: `barge_in = true` in the live provider keeps the microphone open while the
+  assistant speaks, and the server's `input_audio_buffer.speech_started` stops playback and drops the rest of that
+  reply. Off by default: it needs headphones or echo cancellation.
+
 ## [0.1.12] - 2026-10-26
 
 ### Changed

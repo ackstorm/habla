@@ -297,6 +297,7 @@ api_key = "env:HABLA_API_KEY"  # or cmd:COMMAND; never a literal credential
 # style = "warm"               # reuses [styles.warm]
 # tools = false                # unset: file tools (below)
 # max_seconds = 3600           # the session's limit
+# barge_in = true              # speaking interrupts the reply (headphones or echo cancellation)
 ```
 
 The endpoint is the full WebSocket URL; Live uses `Authorization: Bearer` and the gateway's realtime event protocol,
@@ -324,9 +325,12 @@ bridge). `instructions` sends native session instructions and the provider's `vo
 supports it, and Habla requires the server to confirm. Voice names must be valid for the realtime model.
 `system_instruction` is rejected for `[live]`.
 
-Audio is raw 24 kHz mono PCM16 through `pw-record`/`pw-play`, falling back to `parecord`/`paplay`. Limitations: turns
-are taken (microphone input is discarded while the assistant responds, so wait for *Listening…*), no speech
-interruption, one live session at a time (concurrent dictation or `habla say` is unsupported), no tray controls,
+Audio is raw 24 kHz mono PCM16 through `pw-record`/`pw-play`, falling back to `parecord`/`paplay`. By default turns
+are taken: microphone input is discarded while the assistant responds, so wait for *Listening…*. With `barge_in = true`
+the microphone stays open and speaking interrupts the reply: the server's voice detection cancels it and Habla stops
+playback at once. Use headphones or echo cancellation (PipeWire's `libpipewire-module-echo-cancel`), or the assistant
+hears itself and stops; the provider must send `input_audio_buffer.speech_started` (OpenAI does; check a Gemini bridge
+before relying on it). Limitations: one live session at a time (concurrent dictation or `habla say` is unsupported), no tray controls,
 hotkeys, reconnects or saved recordings. Ctrl+C ends capture and playback at once; the live provider's `max_seconds`
 bounds the session (3600 s, 60 minutes, by default; `general.max_seconds` limits dictation only). Compatibility with
 every realtime provider is not promised.

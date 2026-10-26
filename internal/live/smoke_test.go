@@ -93,7 +93,7 @@ func TestRealtimeGatewayRecordedAudio(t *testing.T) {
 			cancel()
 		}
 		return err
-	}, opening, &transcript, listening(ready), nil)
+	}, opening, false, &transcript, listening(ready), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

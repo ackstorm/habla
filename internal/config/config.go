@@ -159,6 +159,7 @@ instructions_mode = "instructions" # inline | instructions; unset: voice and sty
 # style = "storyteller"
 # tools  = false                     # unset: the model may create files where habla live runs
 # max_seconds = 3600                 # the session's limit (unset: 60 minutes)
+# barge_in = true                    # speaking interrupts the reply; needs headphones or echo cancellation
 
 # Delivery styles shared by tts and live providers; instructions may span lines: instructions = """ … """
 [styles.default]
@@ -286,6 +287,7 @@ type Live struct {
 	Style            string   `toml:"style"`
 	Tools            bool     `toml:"tools"`       // habla live's file tools; true when unset
 	MaxSeconds       int      `toml:"max_seconds"` // the session's limit; 3600 when unset
+	BargeIn          bool     `toml:"barge_in"`    // keep the microphone open: speaking interrupts the reply
 	Instructions     string   `toml:"-"`           // the style's, resolved
 }
 type STT struct {

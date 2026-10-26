@@ -86,6 +86,7 @@ voices = ["marin", "cedar"]
 # style = "storyteller"
 # tools = false
 # max_seconds = 3600
+# barge_in = true
 
 [styles.default]
 instructions = "Speak clearly in a calm, friendly tone."
@@ -237,7 +238,8 @@ ignores them. A LiteLLM Gemini bridge passes tools
 only with `litellm_settings: gemini_live_defer_setup: true`; without it the model says it has no tools. Context is
 supplied with `habla live --context FILE` (UTF-8, at most 1 MiB), read once before connecting and sent to the
 service as a conversation item. The service may acknowledge it before the first spoken turn. This command uses
-the terminal, streams 24 kHz mono PCM16, pauses microphone transmission during responses, and ends on Ctrl+C
+the terminal, streams 24 kHz mono PCM16, pauses microphone transmission during responses (`barge_in = true` keeps it open: speaking interrupts the reply,
+which needs headphones or echo cancellation), and ends on Ctrl+C
 or the live provider's `max_seconds` (default 3600; `general.max_seconds` is for dictation only). Transcript text
 is saved incrementally by default under the config directory as
 `live_YYYYMMDD_HHMMSS.txt` (local time, permissions `0600`, no overwrite); partial text remains after termination.
