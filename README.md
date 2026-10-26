@@ -133,8 +133,8 @@ an inactive entry reading `$ELEVENLABS_API_KEY`). It takes no `instructions_mode
 rejected in `stt` and `llm`. A `voices` list may use `"Name=ID"` entries: `voice` can be the name or the ID, and the
 request carries the ID.
 
-**Tray choices** (only what dictation uses: *Transform*, *STT provider* and *LLM provider* with two or more
-providers, *Also paste automatically*, *And press Enter*) are written into
+**Tray choices** (only what dictation uses: *Transform*, *STT provider* and *LLM provider*, which show the active
+provider even when it is the only one, *Also paste automatically*, *And press Enter*) are written into
 `config.toml`, keeping its other lines and comments; *None* writes `transform = ""`. The tray reloads the file whenever
 it is saved, so *Edit config…* applies at once (except `hotkey`, which needs a tray restart).
 

@@ -5,6 +5,11 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Changed
+
+- The tray menu always shows *STT provider* and *LLM provider*, with the active one ticked, even when only one is
+  configured.
+
 ## [0.1.7] - 2026-10-23
 
 ### Changed

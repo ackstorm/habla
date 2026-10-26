@@ -91,8 +91,8 @@ func TestMenuChoicesListProviders(t *testing.T) {
 		}
 	}
 	c.Providers["stt"] = config.Providers{Active: "solo", Names: []string{"solo"}}
-	if _, ok := MenuChoices(c)["stt_provider"]; ok {
-		t.Fatal("a single provider needs no list")
+	if got, want := MenuChoices(c)["stt_provider"], []Choice{{"solo", "solo", true}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("a single provider is listed, active: %+v", got)
 	}
 }
 

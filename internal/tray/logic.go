@@ -238,8 +238,8 @@ func PillHint(phase, key string, held bool) []Segment {
 }
 
 // MenuChoices are the menu's radio lists, keyed by their config.SaveChoice name: only what dictation uses. The
-// transform presets come after "none" in file order. stt and llm with two or more providers get a <service>_provider
-// list.
+// transform presets come after "none" in file order. stt and llm always get a <service>_provider list, even of one,
+// so the menu shows which provider is in use.
 func MenuChoices(c *config.Config) map[string][]Choice {
 	choices := map[string][]Choice{}
 	if c.STT != nil && c.LLM != nil {
@@ -251,7 +251,7 @@ func MenuChoices(c *config.Config) map[string][]Choice {
 	}
 	for _, service := range []string{"stt", "llm"} {
 		p := c.Providers[service]
-		if len(p.Names) < 2 {
+		if len(p.Names) == 0 {
 			continue
 		}
 		list := []Choice{}
