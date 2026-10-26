@@ -280,6 +280,7 @@ style is not applied and `habla say` warns once. An unset style speaks the origi
 habla live --context ./notes.txt
 habla live --no-output                    # terminal transcript only
 habla live --output-file ./discussion.txt # choose where the transcript is saved
+habla live --no-tools                     # no file tools for this run
 ```
 
 The default config ships an `openai` live provider. A gateway with a realtime bridge works the same way:
@@ -294,6 +295,7 @@ model = "gemini.gemini-3.8-live"
 api_key = "env:HABLA_API_KEY"  # or cmd:COMMAND; never a literal credential
 # instructions_mode = "inline" # unset: styles disabled; inline | instructions
 # style = "warm"               # reuses [styles.warm]
+# tools = true                 # the model takes function tools (file tools below)
 ```
 
 The endpoint is the full WebSocket URL; Live uses `Authorization: Bearer` and the gateway's realtime event protocol,
@@ -304,6 +306,15 @@ Conversation text appears in the terminal and is saved incrementally to `~/.conf
 (`$XDG_CONFIG_HOME/habla` when set; mode `0600`, never overwrites a file, keeps partial text on cancellation or
 failure). `--no-output` disables saving; `--output-file FILE` selects another path (mutually exclusive). The transcript
 excludes context, style settings, credentials and status messages; if it cannot be written the session stops.
+
+With `tools = true` in the live provider (the model takes function tools; the default `openai` provider has it), the
+model can create text files in the folder where you run `habla live`, and edit or delete the files it created in
+that conversation; nothing else. Ask out loud: *"write a summary of what we said to summaries/today.md"*. It cannot
+read, change or delete a file that was there before, and paths cannot leave the folder (links included). Each call
+appears in the transcript as a `Tool:` line (the tool and path, never the content). `--no-tools` turns them off for
+a run. OpenAI and Gemini models take the same tools, as both speak the realtime event protocol (Gemini through the
+gateway's bridge). Tools go in the first `session.update`: a LiteLLM Gemini bridge needs
+`litellm_settings: gemini_live_defer_setup: true`, or the model answers that it has no tools.
 
 A shared `[styles.*]` can be used with `style` and `instructions_mode`, independent of the TTS selection. `inline`
 puts the style's delivery instructions in the opening conversation message and leaves the service's native voice

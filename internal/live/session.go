@@ -25,7 +25,13 @@ type event struct {
 	Type       string `json:"type"`
 	Delta      string `json:"delta"`
 	Transcript string `json:"transcript"`
-	Response   struct {
+	Item       struct {
+		Type      string `json:"type"`
+		Name      string `json:"name"`
+		CallID    string `json:"call_id"`
+		Arguments string `json:"arguments"`
+	} `json:"item"`
+	Response struct {
 		Status string `json:"status"`
 	} `json:"response"`
 	Session struct {
@@ -40,7 +46,9 @@ type event struct {
 	} `json:"session"`
 }
 
-func connect(ctx context.Context, cfg config.Live, key, background string, style config.Delivery) (*websocket.Conn, bool, error) {
+// connect opens the session; files (nil: none) declares its tools in the first session.update, the only one the
+// gateway's Gemini bridge applies.
+func connect(ctx context.Context, cfg config.Live, key, background string, style config.Delivery, files *tools) (*websocket.Conn, bool, error) {
 	u, err := url.Parse(cfg.Endpoint)
 	if err != nil {
 		return nil, false, errors.New("Invalid realtime endpoint")
@@ -82,6 +90,9 @@ func connect(ctx context.Context, cfg config.Live, key, background string, style
 			"input":  map[string]any{"format": map[string]any{"type": "audio/pcm", "rate": 24000}, "turn_detection": map[string]string{"type": "server_vad"}},
 			"output": map[string]any{"format": map[string]any{"type": "audio/pcm", "rate": 24000}},
 		}}
+	}
+	if files != nil {
+		session["tools"], session["tool_choice"] = files.declarations(), "auto"
 	}
 	native := cfg.InstructionsMode == "instructions" && (style.Instructions != "" || style.Voice != "")
 	if native {
@@ -145,8 +156,9 @@ func connect(ctx context.Context, cfg config.Live, key, background string, style
 	return c, opening, nil
 }
 
-// converse owns mic and c until return. play must stop when its context is cancelled.
-func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play func(context.Context, io.Reader) error, awaitingContext bool, out, status io.Writer) error {
+// converse owns mic and c until return. play must stop when its context is cancelled. A response that calls files'
+// tools gets their outputs and a follow-up response; the microphone stays paused until that one is done.
+func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play func(context.Context, io.Reader) error, awaitingContext bool, out, status io.Writer, files *tools) error {
 	ctx, cancel := context.WithCancel(parent)
 	var wg sync.WaitGroup
 	defer func() { cancel(); c.Close(); mic.Close(); wg.Wait() }()
@@ -162,6 +174,13 @@ func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play
 		if _, err := fmt.Fprintf(out, format, args...); err != nil {
 			fail(errors.New("Could not write conversation transcript"))
 		}
+	}
+	var sending sync.Mutex // the microphone and the tool outputs share the socket
+	send := func(v any) error {
+		sending.Lock()
+		defer sending.Unlock()
+		c.SetWriteDeadline(time.Now().Add(gateway.ConnectTimeout))
+		return c.WriteJSON(v)
 	}
 	var paused atomic.Bool
 	paused.Store(awaitingContext)
@@ -180,8 +199,7 @@ func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play
 			if paused.Load() {
 				continue
 			}
-			c.SetWriteDeadline(time.Now().Add(gateway.ConnectTimeout))
-			if err := c.WriteJSON(map[string]string{"type": "input_audio_buffer.append", "audio": base64.StdEncoding.EncodeToString(frame)}); err != nil {
+			if err := send(map[string]string{"type": "input_audio_buffer.append", "audio": base64.StdEncoding.EncodeToString(frame)}); err != nil {
 				fail(errors.New("Could not stream microphone audio"))
 				return
 			}
@@ -246,6 +264,8 @@ func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play
 	}
 	transcriptStarted := false
 	audioBytes := 0
+	var calls []event // function calls of the current response
+	followUp := false // a response.create for tool outputs is pending: its response.created is not an overlap
 	for ctx.Err() == nil {
 		var e event
 		if err := c.ReadJSON(&e); err != nil {
@@ -258,13 +278,14 @@ func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play
 		case "error":
 			fail(errors.New("Realtime gateway rejected the session or request"))
 		case "response.created":
-			if paused.Swap(true) && !awaitingContext {
+			if paused.Swap(true) && !awaitingContext && !followUp {
 				fail(errors.New("Overlapping responses are not supported"))
 				break
 			}
-			if !awaitingContext {
+			if !awaitingContext && !followUp {
 				fmt.Fprintln(status, "Responding… microphone input paused.")
 			}
+			followUp = false
 		case "response.audio.delta", "response.output_audio.delta":
 			paused.Store(true)
 			pcm, err := base64.StdEncoding.DecodeString(e.Delta)
@@ -279,6 +300,10 @@ func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play
 					break
 				}
 				pcm = pcm[n:]
+			}
+		case "response.output_item.done":
+			if e.Item.Type == "function_call" && files != nil {
+				calls = append(calls, e)
 			}
 		case "conversation.item.input_audio_transcription.completed":
 			if e.Transcript != "" {
@@ -306,6 +331,22 @@ func converse(parent context.Context, c *websocket.Conn, mic io.ReadCloser, play
 			if transcriptStarted {
 				write("\n")
 				transcriptStarted = false
+			}
+			if len(calls) > 0 {
+				for _, call := range calls {
+					output, summary := files.call(call.Item.Name, call.Item.Arguments)
+					write("Tool: %s\n", summary)
+					if err := send(map[string]any{"type": "conversation.item.create", "item": map[string]any{
+						"type": "function_call_output", "call_id": call.Item.CallID, "output": output}}); err != nil {
+						fail(errors.New("Could not send a tool result"))
+					}
+				}
+				calls = nil
+				if err := send(map[string]string{"type": "response.create"}); err != nil {
+					fail(errors.New("Could not send a tool result"))
+				}
+				followUp = true
+				break
 			}
 			awaitingContext = false
 			queue(nil)

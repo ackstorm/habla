@@ -84,6 +84,7 @@ voice = "marin"
 voices = ["marin", "cedar"]
 # instructions_mode = "instructions"
 # style = "storyteller"
+tools = true
 
 [styles.default]
 instructions = "Speak clearly in a calm, friendly tone."
@@ -215,6 +216,7 @@ voice = "marin"
 voices = ["marin", "cedar"]
 instructions_mode = "instructions" # inline | instructions; unset: voice and style disabled
 # style = "storyteller"        # existing [styles.storyteller]
+tools = true                   # the model takes function tools (a LiteLLM Gemini bridge: gemini_live_defer_setup)
 ```
 
 `endpoint` is the full `wss:` URL without query, fragment or embedded credentials; Habla adds the `model` query
@@ -226,7 +228,11 @@ sends only the style's delivery instructions in the initial conversation item an
 confirmation in `session.updated`; this supports OpenAI Realtime. Use `inline` when the Gemini gateway ignores
 native setup updates. `system_instruction` is rejected for live: it is a Gemini batch field, not a field in this
 WebSocket protocol. Do not promise accent quality or assume TTS voice names are valid for the realtime model.
-There are no `api`, `models` or audio settings in a live provider. Context is
+There are no `api`, `models` or audio settings in a live provider: OpenAI and Gemini models both use the realtime
+event protocol, Gemini through the gateway's bridge. `tools = true` (default false) declares that the model takes
+function tools: `habla live` then lets it create text files in the folder it runs in, and edit or delete only the
+files it created in that conversation (`--no-tools` turns this off for a run). A LiteLLM Gemini bridge passes tools
+only with `litellm_settings: gemini_live_defer_setup: true`; without it the model says it has no tools. Context is
 supplied with `habla live --context FILE` (UTF-8, at most 1 MiB), read once before connecting and sent to the
 service as a conversation item. The service may acknowledge it before the first spoken turn. This command uses
 the terminal, streams 24 kHz mono PCM16, pauses microphone transmission during responses, and ends on Ctrl+C

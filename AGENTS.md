@@ -21,6 +21,14 @@ Push-to-dictate for the Linux desktop through OpenAI-compatible, Gemini or Eleve
 - `plugins/habla`: shared Claude Code/Codex plugin: the `habla` skill configures user TOML and speaks through `habla say`;
   its bundled schema example is checked against the real parser by `internal/release/plugin_test.go`.
 - `main.go`: `habla listen` → `listen.Main`, `habla say` → `say.Main`, `habla stats` → `stats.Main`, `habla live` → `live.Main`, `habla tray` → `tray.Main`.
+- `internal/live`: `habla live` (`connect` → `converse`, OpenAI Realtime events only; Gemini comes through the gateway's
+  bridge). `tools.go`: file tools (`write_file`, `edit_file`, `delete_file`; the last two only on files `created` this session) on an
+  `os.Root` at the cwd, with provider `tools = true` and no `--no-tools`; `connect` declares them in the first `session.update` (the
+  Gemini bridge applies no other, and passes tools only with LiteLLM's `gemini_live_defer_setup`); `converse` collects
+  `function_call` items from `response.output_item.done`, and at `response.done` sends each `function_call_output`
+  + one `response.create` (`followUp`: its `response.created` is not an overlap; the mic stays paused). The mic and
+  tool outputs share the socket through `send`. Live check: `HABLA_LIVE=1` + `HABLA_LIVE_REALTIME_URL`/`_MODEL` +
+  `HABLA_API_KEY` → `TestRealtimeGatewayToolCall` (text in, no TTS).
 - `internal/say`: `habla say`. `config.TTS.Delivery` selects the style voice/instructions and warns if a style is inactive. One `gateway.Speak` request → `--out FILE`, or
   `say.wav` played by `pw-play`/`paplay` while holding `say.pid` (no `state`); SIGTERM (`--stop`) terminates the player, exit 0.
 - `internal/hotkey`: pure hold-to-talk logic: `Parse`/`Label`/`PortalTrigger`, `Keysym` table, `GrabMasks`, `DropAutoRepeat`, `PortalEvent`, `Hold` (`Event` slices → start/stop/cancel; `Active()`).

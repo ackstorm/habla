@@ -27,6 +27,7 @@ import (
 func Main(args []string) (code int) {
 	fs := flag.NewFlagSet("habla live", flag.ContinueOnError)
 	contextFile := fs.String("context", "", "text `FILE` to discuss (sent to the realtime service)")
+	noTools := fs.Bool("no-tools", false, "do not let the model create files here, even with tools = true")
 	noOutput := fs.Bool("no-output", false, "do not save a transcript (terminal output remains enabled)")
 	outputFile := fs.String("output-file", "", "save the transcript to `FILE` instead of the default timestamped file")
 	provider := fs.String("provider", "", "use the live provider `NAME` for this run")
@@ -40,7 +41,7 @@ func Main(args []string) (code int) {
 		return 2
 	}
 	if fs.NArg() != 0 || (*noOutput && *outputFile != "") {
-		fmt.Fprintln(os.Stderr, "usage: habla live [--context FILE] [--no-output | --output-file FILE] [--provider NAME] [--style NAME] [--log LEVEL]")
+		fmt.Fprintln(os.Stderr, "usage: habla live [--context FILE] [--no-tools] [--no-output | --output-file FILE] [--provider NAME] [--style NAME] [--log LEVEL]")
 		return 2
 	}
 	if err := logs.Setup("live", *logLevel); err != nil {
@@ -75,6 +76,14 @@ func Main(args []string) (code int) {
 		}
 	}
 	style := cfg.LiveDelivery()
+	var files *tools
+	if cfg.Live.Tools && !*noTools {
+		if files, err = openTools("."); err != nil {
+			fmt.Fprintln(os.Stderr, "habla live:", err)
+			return 1
+		}
+		defer files.root.Close()
+	}
 	if (cfg.Live.Style != "" || cfg.Live.Voice != "") && cfg.Live.InstructionsMode == "" {
 		slog.Warn("Live voice and style are not applied: set instructions_mode in the live provider")
 	}
@@ -135,7 +144,11 @@ func Main(args []string) (code int) {
 		return 1
 	}
 	fmt.Fprintln(os.Stderr, "Connecting…")
-	c, opening, err := connect(session, *cfg.Live, key, background, style)
+	if files != nil {
+		dir, _ := os.Getwd()
+		fmt.Fprintln(os.Stderr, "Files: new files in", dir, "(--no-tools: none)")
+	}
+	c, opening, err := connect(session, *cfg.Live, key, background, style, files)
 	if err == nil {
 		defer c.Close()
 		recordCtx, stop := context.WithCancel(session)
@@ -153,7 +166,7 @@ func Main(args []string) (code int) {
 				play := audioProcess(ctx, player)
 				play.Stdin = pcm
 				return play.Run()
-			}, opening, output, os.Stderr)
+			}, opening, output, os.Stderr, files)
 			stop()
 			mic.Close()
 			cmd.Wait()

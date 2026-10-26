@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -32,7 +33,7 @@ func TestRealtimeGatewayRecordedAudio(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 	c, opening, err := connect(ctx, config.Live{Endpoint: env["HABLA_LIVE_REALTIME_URL"], Model: env["HABLA_LIVE_REALTIME_MODEL"], InstructionsMode: "inline"}, key,
-		"The project codename is COBALT. When I say hello world, reply with only the project codename.", config.Delivery{Instructions: "Keep every answer short and speak with a calm delivery."})
+		"The project codename is COBALT. When I say hello world, reply with only the project codename.", config.Delivery{Instructions: "Keep every answer short and speak with a calm delivery."}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +93,7 @@ func TestRealtimeGatewayRecordedAudio(t *testing.T) {
 			cancel()
 		}
 		return err
-	}, opening, &transcript, listening(ready))
+	}, opening, &transcript, listening(ready), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,4 +114,67 @@ func (l listening) Write(p []byte) (int, error) {
 		}
 	}
 	return len(p), nil
+}
+
+// The gateway passes tools to Gemini only with LiteLLM's gemini_live_defer_setup (enabled 2026-10-26): without it the
+// model says it has no tools. Text in, so no TTS is needed.
+func TestRealtimeGatewayToolCall(t *testing.T) {
+	url, model, key := os.Getenv("HABLA_LIVE_REALTIME_URL"), os.Getenv("HABLA_LIVE_REALTIME_MODEL"), os.Getenv("HABLA_API_KEY")
+	if os.Getenv("HABLA_LIVE") != "1" || url == "" || model == "" || key == "" {
+		t.Skip("set HABLA_LIVE=1, HABLA_LIVE_REALTIME_URL, HABLA_LIVE_REALTIME_MODEL and HABLA_API_KEY to call the realtime gateway")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	dir := t.TempDir()
+	files, err := openTools(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer files.root.Close()
+	c, _, err := connect(ctx, config.Live{Endpoint: url, Model: model, InstructionsMode: "inline"}, key, "", config.Delivery{}, files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	c.WriteJSON(map[string]any{"type": "conversation.item.create", "item": map[string]any{"type": "message", "role": "user",
+		"content": []map[string]string{{"type": "input_text", "text": "Create the file hello.txt containing exactly: hola"}}}})
+	c.WriteJSON(map[string]string{"type": "response.create"})
+	called, followed := false, false
+	for ctx.Err() == nil {
+		c.SetReadDeadline(time.Now().Add(30 * time.Second))
+		var e event
+		if err := c.ReadJSON(&e); err != nil {
+			t.Fatal(err)
+		}
+		switch {
+		case e.Type == "error":
+			t.Fatal("the gateway sent an error")
+		case e.Type == "response.output_item.done" && e.Item.Type == "function_call":
+			output, summary := files.call(e.Item.Name, e.Item.Arguments)
+			t.Logf("Tool: %s", summary)
+			c.WriteJSON(map[string]any{"type": "conversation.item.create", "item": map[string]any{
+				"type": "function_call_output", "call_id": e.Item.CallID, "output": output}})
+			called = true
+		case e.Type == "response.done" && e.Response.Status != "" && e.Response.Status != "completed":
+			t.Fatalf("response.done status %q: converse would end the session", e.Response.Status)
+		case e.Type == "response.done" && called && !followed: // as converse does
+			c.WriteJSON(map[string]string{"type": "response.create"})
+			followed = true
+		case e.Type == "response.done" && followed:
+			if data, err := os.ReadFile(filepath.Join(dir, "hello.txt")); err != nil || strings.TrimSpace(string(data)) != "hola" {
+				t.Fatalf("hello.txt = %q, %v", data, err)
+			}
+			// A bridge that also answered the tool output by itself would overlap converse's follow-up.
+			c.SetReadDeadline(time.Now().Add(3 * time.Second))
+			for c.ReadJSON(&e) == nil {
+				if e.Type == "response.created" {
+					t.Fatal("a second response answered the tool output")
+				}
+			}
+			return
+		case e.Type == "response.done":
+			t.Fatal("the response ended without a tool call: are tools reaching the model?")
+		}
+	}
+	t.Fatal(ctx.Err())
 }

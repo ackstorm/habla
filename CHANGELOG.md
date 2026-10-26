@@ -5,6 +5,13 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Added
+
+- `habla live` can create files where it runs, and edit or delete the ones it created in that conversation, so you
+  can say "write a summary to notes/today.md". It needs `tools = true` in the live provider (the default `openai`
+  provider has it; add it to a gateway provider whose model takes tools); `--no-tools` turns it off for a run. Each
+  call is a `Tool:` line in the transcript.
+
 ## [0.1.9] - 2026-10-26
 
 ### Added

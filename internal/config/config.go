@@ -157,6 +157,7 @@ voice    = "marin"
 voices   = ["marin", "cedar"]
 instructions_mode = "instructions" # inline | instructions; unset: voice and style not applied
 # style = "storyteller"
+tools    = true                      # the model takes tools: it may create files where habla live runs
 
 # Delivery styles shared by tts and live providers; instructions may span lines: instructions = """ … """
 [styles.default]
@@ -282,7 +283,8 @@ type Live struct {
 	Voices           []string `toml:"voices"` // tray menu choices for voice
 	InstructionsMode string   `toml:"instructions_mode"`
 	Style            string   `toml:"style"`
-	Instructions     string   `toml:"-"` // the style's, resolved
+	Tools            bool     `toml:"tools"` // the model takes function tools: habla live's file tools
+	Instructions     string   `toml:"-"`     // the style's, resolved
 }
 type STT struct {
 	Conn

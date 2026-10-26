@@ -107,7 +107,7 @@ func TestLiveStyleIsSentThroughTheSelectedMode(t *testing.T) {
 					problem <- ""
 				}
 			})
-			c, opening, err := connect(ctx, config.Live{Endpoint: url, Model: "test-model", InstructionsMode: mode}, "test-token", "project context", config.Delivery{Voice: "marin", Instructions: "Speak with an Andalusian accent."})
+			c, opening, err := connect(ctx, config.Live{Endpoint: url, Model: "test-model", InstructionsMode: mode}, "test-token", "project context", config.Delivery{Voice: "marin", Instructions: "Speak with an Andalusian accent."}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -134,7 +134,7 @@ func TestNativeStyleCannotBeSilentlyIgnored(t *testing.T) {
 		c.WriteJSON(map[string]any{"type": "session.updated", "session": map[string]any{}})
 		c.ReadMessage()
 	})
-	_, _, err := connect(ctx, config.Live{Endpoint: url, Model: "test-model", InstructionsMode: "instructions"}, "test-token", "", config.Delivery{Instructions: "private-style"})
+	_, _, err := connect(ctx, config.Live{Endpoint: url, Model: "test-model", InstructionsMode: "instructions"}, "test-token", "", config.Delivery{Instructions: "private-style"}, nil)
 	if err == nil || strings.Contains(err.Error(), "private-style") {
 		t.Fatalf("ignored or leaked native style: %v", err)
 	}
@@ -199,7 +199,7 @@ func TestContextAndMicrophoneStreamBeforeResponseCompletes(t *testing.T) {
 		cancel()
 		c.ReadMessage()
 	})
-	c, opening, err := connect(ctx, config.Live{Endpoint: url, Model: "test-model"}, "test-token", "project codename: COBALT", config.Delivery{})
+	c, opening, err := connect(ctx, config.Live{Endpoint: url, Model: "test-model"}, "test-token", "project codename: COBALT", config.Delivery{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestContextAndMicrophoneStreamBeforeResponseCompletes(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer file.Close()
-	err = converse(ctx, c, mic, play, opening, io.MultiWriter(&transcript, file), io.Discard)
+	err = converse(ctx, c, mic, play, opening, io.MultiWriter(&transcript, file), io.Discard, nil)
 	if problem := <-serverErr; problem != "" {
 		t.Fatal(problem)
 	}
@@ -267,13 +267,13 @@ func TestTranscriptWriteFailureStopsSessionWithoutLeakingContent(t *testing.T) {
 		c.WriteJSON(map[string]any{"type": "conversation.item.input_audio_transcription.completed", "transcript": "private-context"})
 		c.ReadMessage()
 	})
-	c, _, err := connect(ctx, config.Live{Endpoint: url, Model: "test-model"}, "test-token", "", config.Delivery{})
+	c, _, err := connect(ctx, config.Live{Endpoint: url, Model: "test-model"}, "test-token", "", config.Delivery{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	mic, feed := io.Pipe()
 	defer feed.Close()
-	err = converse(ctx, c, mic, func(context.Context, io.Reader) error { return nil }, false, failedTranscript{}, io.Discard)
+	err = converse(ctx, c, mic, func(context.Context, io.Reader) error { return nil }, false, failedTranscript{}, io.Discard, nil)
 	if err == nil || !strings.Contains(err.Error(), "transcript") || strings.Contains(err.Error(), "private-context") || strings.Contains(err.Error(), "token-value") {
 		t.Fatalf("unsafe or missing transcript error: %v", err)
 	}
@@ -295,14 +295,14 @@ func TestProtocolFailuresDoNotEchoPayloads(t *testing.T) {
 				c.WriteMessage(websocket.TextMessage, []byte(payload))
 				c.ReadMessage()
 			})
-			c, _, err := connect(ctx, config.Live{Endpoint: url, Model: "test-model"}, "test-token", "", config.Delivery{})
+			c, _, err := connect(ctx, config.Live{Endpoint: url, Model: "test-model"}, "test-token", "", config.Delivery{}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer c.Close()
 			mic, feed := io.Pipe()
 			defer feed.Close()
-			err = converse(ctx, c, mic, func(context.Context, io.Reader) error { return nil }, false, io.Discard, io.Discard)
+			err = converse(ctx, c, mic, func(context.Context, io.Reader) error { return nil }, false, io.Discard, io.Discard, nil)
 			if err == nil || strings.Contains(err.Error(), "private-context") || strings.Contains(err.Error(), "test-token") {
 				t.Fatalf("unsafe or missing error: %v", err)
 			}
@@ -320,7 +320,7 @@ func TestCancelUnblocksCaptureAndPlayback(t *testing.T) {
 		c.WriteJSON(map[string]any{"type": "response.output_audio.delta", "delta": "AQIDBA=="})
 		c.ReadMessage()
 	})
-	c, _, err := connect(ctx, config.Live{Endpoint: url, Model: "test-model"}, "test-token", "", config.Delivery{})
+	c, _, err := connect(ctx, config.Live{Endpoint: url, Model: "test-model"}, "test-token", "", config.Delivery{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,7 +333,7 @@ func TestCancelUnblocksCaptureAndPlayback(t *testing.T) {
 			close(playing)
 			<-ctx.Done()
 			return ctx.Err()
-		}, false, io.Discard, io.Discard)
+		}, false, io.Discard, io.Discard, nil)
 	}()
 	select {
 	case <-playing:
@@ -374,7 +374,7 @@ func TestMicrophoneResumesOnlyAfterPlaybackDrains(t *testing.T) {
 		close(release)
 		<-ctx.Done()
 	})
-	c, _, err := connect(ctx, config.Live{Endpoint: url, Model: "test-model"}, "test-token", "", config.Delivery{})
+	c, _, err := connect(ctx, config.Live{Endpoint: url, Model: "test-model"}, "test-token", "", config.Delivery{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -401,7 +401,7 @@ func TestMicrophoneResumesOnlyAfterPlaybackDrains(t *testing.T) {
 		case <-ctx.Done():
 			return ctx.Err()
 		}
-	}, false, io.Discard, io.Discard)
+	}, false, io.Discard, io.Discard, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -425,7 +425,7 @@ func TestAudioBurstWaitsForPlayback(t *testing.T) {
 				c.WriteJSON(map[string]any{"type": "response.done", "response": map[string]any{"status": "completed"}})
 				c.ReadMessage()
 			})
-			c, _, err := connect(ctx, config.Live{Endpoint: url, Model: "test-model"}, "test-token", "", config.Delivery{})
+			c, _, err := connect(ctx, config.Live{Endpoint: url, Model: "test-model"}, "test-token", "", config.Delivery{}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -445,7 +445,7 @@ func TestAudioBurstWaitsForPlayback(t *testing.T) {
 					data, err := io.ReadAll(r)
 					played <- data
 					return err
-				}, false, io.Discard, io.Discard)
+				}, false, io.Discard, io.Discard, nil)
 			}()
 			select {
 			case <-playing:
@@ -486,8 +486,107 @@ func TestHandshakeErrorOmitsResponseBody(t *testing.T) {
 		http.Error(w, "private-context test-token", http.StatusUnauthorized)
 	}))
 	defer s.Close()
-	_, _, err := connect(context.Background(), config.Live{Endpoint: "ws" + strings.TrimPrefix(s.URL, "http"), Model: "test-model"}, "test-token", "", config.Delivery{})
+	_, _, err := connect(context.Background(), config.Live{Endpoint: "ws" + strings.TrimPrefix(s.URL, "http"), Model: "test-model"}, "test-token", "", config.Delivery{}, nil)
 	if err == nil || !strings.Contains(err.Error(), "401") || strings.Contains(err.Error(), "test-token") || strings.Contains(err.Error(), "private-context") {
 		t.Fatalf("unsafe handshake error: %v", err)
+	}
+}
+
+func TestToolCallRunsAndTheModelAnswersWithItsOutput(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	dir := t.TempDir()
+	files, err := openTools(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer files.root.Close()
+	serverErr := make(chan string, 1)
+	url := socket(t, func(c *websocket.Conn) {
+		var setup struct {
+			Type    string `json:"type"`
+			Session struct {
+				Tools []struct {
+					Name string `json:"name"`
+				} `json:"tools"`
+				ToolChoice string `json:"tool_choice"`
+			} `json:"session"`
+		}
+		if c.ReadJSON(&setup) != nil || setup.Type != "session.update" || len(setup.Session.Tools) != 3 ||
+			setup.Session.Tools[0].Name != "write_file" || setup.Session.ToolChoice != "auto" {
+			serverErr <- "the first session.update does not declare the file tools"
+			return
+		}
+		c.WriteJSON(map[string]any{"type": "response.created"})
+		c.WriteJSON(map[string]any{"type": "response.output_item.done", "item": map[string]any{"type": "function_call",
+			"name": "write_file", "call_id": "call_1", "arguments": `{"path":"notes/summary.md","content":"We talked."}`}})
+		c.WriteJSON(map[string]any{"type": "response.done", "response": map[string]any{"status": "completed"}})
+		var output struct {
+			Type string `json:"type"`
+			Item struct {
+				Type   string `json:"type"`
+				CallID string `json:"call_id"`
+				Output string `json:"output"`
+			} `json:"item"`
+		}
+		var next map[string]any
+		for { // microphone frames may still be in flight
+			if c.ReadJSON(&output) != nil {
+				serverErr <- "no tool output"
+				return
+			}
+			if output.Type != "input_audio_buffer.append" {
+				break
+			}
+		}
+		if output.Type != "conversation.item.create" || output.Item.Type != "function_call_output" ||
+			output.Item.CallID != "call_1" || output.Item.Output != "wrote 10 bytes" {
+			serverErr <- "wrong tool output"
+			return
+		}
+		if c.ReadJSON(&next) != nil || next["type"] != "response.create" {
+			serverErr <- "no follow-up response.create"
+			return
+		}
+		c.WriteJSON(map[string]any{"type": "response.created"})
+		c.WriteJSON(map[string]any{"type": "response.output_audio_transcript.delta", "delta": "Saved."})
+		c.WriteJSON(map[string]any{"type": "response.done", "response": map[string]any{"status": "completed"}})
+		var input map[string]any
+		if c.ReadJSON(&input) != nil || input["type"] != "input_audio_buffer.append" {
+			serverErr <- "microphone did not resume"
+			return
+		}
+		serverErr <- ""
+		cancel()
+		c.ReadMessage()
+	})
+	c, _, err := connect(ctx, config.Live{Endpoint: url, Model: "test-model"}, "test-token", "", config.Delivery{}, files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mic, feed := io.Pipe()
+	defer feed.Close()
+	go func() {
+		for ctx.Err() == nil {
+			if _, err := feed.Write(make([]byte, 960)); err != nil {
+				return
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}()
+	var transcript bytes.Buffer
+	err = converse(ctx, c, mic, func(ctx context.Context, r io.Reader) error { _, err := io.Copy(io.Discard, r); return err },
+		false, &transcript, io.Discard, files)
+	if problem := <-serverErr; problem != "" {
+		t.Fatal(problem)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(dir, "notes", "summary.md")); string(data) != "We talked." {
+		t.Fatalf("summary.md = %q", data)
+	}
+	if want := "Tool: write_file notes/summary.md\nAssistant: Saved.\n"; transcript.String() != want {
+		t.Fatalf("transcript %q, want %q", transcript.String(), want)
 	}
 }

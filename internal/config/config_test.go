@@ -88,6 +88,9 @@ func TestFirstRunWritesTheDefaultFile(t *testing.T) {
 	if c.Split != (Split{Enabled: true, After: 10, Pause: 1}) {
 		t.Fatalf("split: %+v", c.Split)
 	}
+	if c.Live == nil || !c.Live.Tools {
+		t.Fatalf("live: %+v, want the default provider to take tools", c.Live)
+	}
 	want := Conn{API: "openai", Endpoint: "https://api.openai.com/v1", AuthHeader: "Authorization", AuthScheme: "bearer", APIKey: "env:OPENAI_API_KEY", Model: "gpt-4o-mini-transcribe", Models: []string{"gpt-4o-mini-transcribe"}}
 	if c.STT == nil || !reflect.DeepEqual(c.STT.Conn, want) || c.STT.Transform != "clean" {
 		t.Fatalf("stt: %+v", c.STT)
