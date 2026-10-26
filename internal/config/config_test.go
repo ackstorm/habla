@@ -159,6 +159,18 @@ func TestLiveConfiguration(t *testing.T) {
 
 const sttConn = "[stt.providers.openai]\nendpoint = \"https://x/v1\"\napi_key = \"env:K\"\nmodel = \"m\"\n"
 
+func TestLiveMaxSecondsIsItsOwn(t *testing.T) {
+	const live = "[general]\nmax_seconds = 300\n[live.providers.test]\nendpoint = \"wss://gateway/v1/realtime\"\nmodel = \"m\"\napi_key = \"env:KEY\"\n"
+	for text, want := range map[string]int{live: 3600, live + "max_seconds = 120\n": 120} {
+		if c, err := parse(text); err != nil || c.Live == nil || c.Live.MaxSeconds != want || c.MaxSeconds != 300 {
+			t.Errorf("%q: live %+v, %v; want max_seconds %d and general 300", text, c.Live, err, want)
+		}
+	}
+	if _, err := parse(live + "max_seconds = 0\n"); err == nil || !strings.Contains(err.Error(), "live.providers.test.max_seconds") {
+		t.Errorf("max_seconds = 0: %v", err)
+	}
+}
+
 func TestLiveToolsDefaultToOn(t *testing.T) {
 	const live = "[live.providers.test]\nendpoint = \"wss://gateway/v1/realtime\"\nmodel = \"m\"\napi_key = \"env:KEY\"\n"
 	for text, want := range map[string]bool{live: true, live + "tools = false\n": false, live + "tools = true\n": true} {

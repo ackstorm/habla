@@ -91,10 +91,6 @@ func Main(args []string) (code int) {
 		fmt.Fprintln(os.Stderr, "habla live requires a terminal; Ctrl+C ends the session")
 		return 2
 	}
-	if cfg.MaxSeconds <= 0 {
-		fmt.Fprintln(os.Stderr, "habla live: general.max_seconds must be positive")
-		return 1
-	}
 	recorder, err := audioCommand(true)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -133,7 +129,7 @@ func Main(args []string) (code int) {
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	session, end := context.WithTimeout(ctx, time.Duration(cfg.MaxSeconds)*time.Second)
+	session, end := context.WithTimeout(ctx, time.Duration(cfg.Live.MaxSeconds)*time.Second)
 	defer end()
 	key, err := gateway.Credential(session, cfg.Live.APIKey)
 	if err != nil {
@@ -175,7 +171,7 @@ func Main(args []string) (code int) {
 	}
 	if session.Err() != nil {
 		if ctx.Err() == nil {
-			fmt.Fprintln(os.Stderr, "Live session reached general.max_seconds.")
+			fmt.Fprintln(os.Stderr, "Live session reached max_seconds (live provider).")
 		}
 		return 0
 	}

@@ -24,7 +24,7 @@ const DefaultTOML = `# Getting started: export OPENAI_API_KEY (or set the stt, l
 # The tray menu or --provider NAME switch providers; the inactive providers below are alternatives.
 # The hotkey is hold-to-talk, and every service is optional.
 [general]
-max_seconds   = 300
+max_seconds   = 300                  # the longest dictation (habla live has its own limit)
 trim_below_db = -45                  # cut quieter audio (dBFS) at both ends; all quieter = not sent; 0 = off
 upload_interval_ms = 50              # audio upload polling interval while recording; 50–1000 ms
 paste_keys    = "auto"               # auto | ctrl+v | ctrl+shift+v
@@ -158,6 +158,7 @@ voices   = ["marin", "cedar"]
 instructions_mode = "instructions" # inline | instructions; unset: voice and style not applied
 # style = "storyteller"
 # tools  = false                     # unset: the model may create files where habla live runs
+# max_seconds = 3600                 # the session's limit (unset: 60 minutes)
 
 # Delivery styles shared by tts and live providers; instructions may span lines: instructions = """ … """
 [styles.default]
@@ -283,8 +284,9 @@ type Live struct {
 	Voices           []string `toml:"voices"` // tray menu choices for voice
 	InstructionsMode string   `toml:"instructions_mode"`
 	Style            string   `toml:"style"`
-	Tools            bool     `toml:"tools"` // habla live's file tools; true when unset
-	Instructions     string   `toml:"-"`     // the style's, resolved
+	Tools            bool     `toml:"tools"`       // habla live's file tools; true when unset
+	MaxSeconds       int      `toml:"max_seconds"` // the session's limit; 3600 when unset
+	Instructions     string   `toml:"-"`           // the style's, resolved
 }
 type STT struct {
 	Conn
@@ -530,8 +532,13 @@ func decode(text string, f *file) (*Config, error) {
 			}
 			if !md.IsDefined("live", "providers", name, "tools") { // a model that takes no tools ignores them
 				p.Tools = true
-				l.Providers[name] = p
 			}
+			if !md.IsDefined("live", "providers", name, "max_seconds") {
+				p.MaxSeconds = 3600
+			} else if p.MaxSeconds <= 0 {
+				return nil, invalid(text, section, "max_seconds", "a positive number of seconds")
+			}
+			l.Providers[name] = p
 		}
 	}
 	for _, service := range services {

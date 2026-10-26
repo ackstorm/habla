@@ -22,7 +22,7 @@ Push-to-dictate for the Linux desktop through OpenAI-compatible, Gemini or Eleve
   its bundled schema example is checked against the real parser by `internal/release/plugin_test.go`.
 - `main.go`: `habla listen` → `listen.Main`, `habla say` → `say.Main`, `habla stats` → `stats.Main`, `habla live` → `live.Main`, `habla tray` → `tray.Main`.
 - `internal/live`: `habla live` (`connect` → `converse`, OpenAI Realtime events only; Gemini comes through the gateway's
-  bridge). `tools.go`: file tools (`write_file`, `edit_file`, `delete_file`; the last two only on files `created` this session) on an
+  bridge; the session ends at the provider's `max_seconds`, 3600 when unset, not `general.max_seconds`). `tools.go`: file tools (`write_file`, `edit_file`, `delete_file`; the last two only on files `created` this session) on an
   `os.Root` at the cwd, with provider `tools` (default true: `md.IsDefined`) and no `--no-tools`; `connect` declares them in the first `session.update` (the
   Gemini bridge applies no other, and passes tools only with LiteLLM's `gemini_live_defer_setup`); `converse` collects
   `function_call` items from `response.output_item.done`, and at `response.done` sends each `function_call_output`

@@ -296,6 +296,7 @@ api_key = "env:HABLA_API_KEY"  # or cmd:COMMAND; never a literal credential
 # instructions_mode = "inline" # unset: styles disabled; inline | instructions
 # style = "warm"               # reuses [styles.warm]
 # tools = false                # unset: file tools (below)
+# max_seconds = 3600           # the session's limit
 ```
 
 The endpoint is the full WebSocket URL; Live uses `Authorization: Bearer` and the gateway's realtime event protocol,
@@ -326,8 +327,9 @@ supports it, and Habla requires the server to confirm. Voice names must be valid
 Audio is raw 24 kHz mono PCM16 through `pw-record`/`pw-play`, falling back to `parecord`/`paplay`. Limitations: turns
 are taken (microphone input is discarded while the assistant responds, so wait for *Listening…*), no speech
 interruption, one live session at a time (concurrent dictation or `habla say` is unsupported), no tray controls,
-hotkeys, reconnects or saved recordings. Ctrl+C ends capture and playback at once; `general.max_seconds` bounds the
-session (300 s by default). Compatibility with every realtime provider is not promised.
+hotkeys, reconnects or saved recordings. Ctrl+C ends capture and playback at once; the live provider's `max_seconds`
+bounds the session (3600 s, 60 minutes, by default; `general.max_seconds` limits dictation only). Compatibility with
+every realtime provider is not promised.
 
 ## Stats & logs
 

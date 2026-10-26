@@ -85,6 +85,7 @@ voices = ["marin", "cedar"]
 # instructions_mode = "instructions"
 # style = "storyteller"
 # tools = false
+# max_seconds = 3600
 
 [styles.default]
 instructions = "Speak clearly in a calm, friendly tone."
@@ -237,7 +238,8 @@ only with `litellm_settings: gemini_live_defer_setup: true`; without it the mode
 supplied with `habla live --context FILE` (UTF-8, at most 1 MiB), read once before connecting and sent to the
 service as a conversation item. The service may acknowledge it before the first spoken turn. This command uses
 the terminal, streams 24 kHz mono PCM16, pauses microphone transmission during responses, and ends on Ctrl+C
-or `general.max_seconds`. Transcript text is saved incrementally by default under the config directory as
+or the live provider's `max_seconds` (default 3600; `general.max_seconds` is for dictation only). Transcript text
+is saved incrementally by default under the config directory as
 `live_YYYYMMDD_HHMMSS.txt` (local time, permissions `0600`, no overwrite); partial text remains after termination.
 `--no-output` disables file saving; `--output-file FILE` chooses another file. The flags are mutually exclusive;
 terminal output remains enabled. Saved text contains provider-supplied conversation transcripts, not raw context,

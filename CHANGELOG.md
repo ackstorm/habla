@@ -5,6 +5,11 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Changed
+
+- `habla live` has its own session limit, `max_seconds` in the live provider (default 3600, 60 minutes), instead of
+  `general.max_seconds` (300), which now limits only dictation.
+
 ## [0.1.11] - 2026-10-26
 
 ### Changed
