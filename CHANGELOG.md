@@ -5,6 +5,8 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-10-26
+
 ### Added
 
 - `habla live` can be interrupted by voice: `barge_in = true` in the live provider keeps the microphone open while the
@@ -149,7 +151,8 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 - `habla` skill for Claude Code and Codex: configuration and spoken replies via `habla say`.
 - One static binary (amd64, arm64) installed by `install.sh` with checksum verification and tray autostart.
 
-[Unreleased]: https://github.com/ackstorm/habla/compare/v0.1.12...HEAD
+[Unreleased]: https://github.com/ackstorm/habla/compare/v0.1.13...HEAD
+[0.1.13]: https://github.com/ackstorm/habla/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/ackstorm/habla/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/ackstorm/habla/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/ackstorm/habla/compare/v0.1.9...v0.1.10
