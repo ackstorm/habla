@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "habla",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Configure Habla through its TOML file and speak to the user out loud with habla say.",
   "author": { "name": "Habla" }
 }

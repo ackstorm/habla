@@ -5,6 +5,8 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-10-26
+
 ### Added
 
 - The tray also plays a short "pip" when Enter sends a dictation (paste, then Enter); `[tray] sound = false` mutes it
@@ -118,7 +120,8 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 - `habla` skill for Claude Code and Codex: configuration and spoken replies via `habla say`.
 - One static binary (amd64, arm64) installed by `install.sh` with checksum verification and tray autostart.
 
-[Unreleased]: https://github.com/ackstorm/habla/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/ackstorm/habla/compare/v0.1.9...HEAD
+[0.1.9]: https://github.com/ackstorm/habla/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/ackstorm/habla/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/ackstorm/habla/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/ackstorm/habla/compare/v0.1.5...v0.1.6
