@@ -5,6 +5,11 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Changed
+
+- Live file tools are on by default: a live provider without `tools` gets them (a model that takes no tools ignores
+  them, as a Gemini bridge without tool support does); `tools = false` turns them off.
+
 ## [0.1.10] - 2026-10-26
 
 ### Added

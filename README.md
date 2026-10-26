@@ -295,7 +295,7 @@ model = "gemini.gemini-3.8-live"
 api_key = "env:HABLA_API_KEY"  # or cmd:COMMAND; never a literal credential
 # instructions_mode = "inline" # unset: styles disabled; inline | instructions
 # style = "warm"               # reuses [styles.warm]
-# tools = true                 # the model takes function tools (file tools below)
+# tools = false                # unset: file tools (below)
 ```
 
 The endpoint is the full WebSocket URL; Live uses `Authorization: Bearer` and the gateway's realtime event protocol,
@@ -307,7 +307,7 @@ Conversation text appears in the terminal and is saved incrementally to `~/.conf
 failure). `--no-output` disables saving; `--output-file FILE` selects another path (mutually exclusive). The transcript
 excludes context, style settings, credentials and status messages; if it cannot be written the session stops.
 
-With `tools = true` in the live provider (the model takes function tools; the default `openai` provider has it), the
+By default (`tools = false` in the live provider turns it off; a model that takes no tools ignores them) the
 model can create text files in the folder where you run `habla live`, and edit or delete the files it created in
 that conversation; nothing else. Ask out loud: *"write a summary of what we said to summaries/today.md"*. It cannot
 read, change or delete a file that was there before, and paths cannot leave the folder (links included). Each call

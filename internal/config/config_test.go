@@ -89,7 +89,7 @@ func TestFirstRunWritesTheDefaultFile(t *testing.T) {
 		t.Fatalf("split: %+v", c.Split)
 	}
 	if c.Live == nil || !c.Live.Tools {
-		t.Fatalf("live: %+v, want the default provider to take tools", c.Live)
+		t.Fatalf("live: %+v, want tools on when unset", c.Live)
 	}
 	want := Conn{API: "openai", Endpoint: "https://api.openai.com/v1", AuthHeader: "Authorization", AuthScheme: "bearer", APIKey: "env:OPENAI_API_KEY", Model: "gpt-4o-mini-transcribe", Models: []string{"gpt-4o-mini-transcribe"}}
 	if c.STT == nil || !reflect.DeepEqual(c.STT.Conn, want) || c.STT.Transform != "clean" {
@@ -158,6 +158,16 @@ func TestLiveConfiguration(t *testing.T) {
 }
 
 const sttConn = "[stt.providers.openai]\nendpoint = \"https://x/v1\"\napi_key = \"env:K\"\nmodel = \"m\"\n"
+
+func TestLiveToolsDefaultToOn(t *testing.T) {
+	const live = "[live.providers.test]\nendpoint = \"wss://gateway/v1/realtime\"\nmodel = \"m\"\napi_key = \"env:KEY\"\n"
+	for text, want := range map[string]bool{live: true, live + "tools = false\n": false, live + "tools = true\n": true} {
+		c, err := parse(text)
+		if err != nil || c.Live == nil || c.Live.Tools != want {
+			t.Errorf("%q: live %+v, %v; want tools %v", text, c.Live, err, want)
+		}
+	}
+}
 
 func TestLiveUsesSharedStyles(t *testing.T) {
 	const live = "[live.providers.test]\nendpoint = \"wss://gateway/v1/realtime\"\nmodel = \"live-model\"\napi_key = \"env:KEY\"\nvoice = \"marin\"\n"

@@ -23,7 +23,7 @@ Push-to-dictate for the Linux desktop through OpenAI-compatible, Gemini or Eleve
 - `main.go`: `habla listen` → `listen.Main`, `habla say` → `say.Main`, `habla stats` → `stats.Main`, `habla live` → `live.Main`, `habla tray` → `tray.Main`.
 - `internal/live`: `habla live` (`connect` → `converse`, OpenAI Realtime events only; Gemini comes through the gateway's
   bridge). `tools.go`: file tools (`write_file`, `edit_file`, `delete_file`; the last two only on files `created` this session) on an
-  `os.Root` at the cwd, with provider `tools = true` and no `--no-tools`; `connect` declares them in the first `session.update` (the
+  `os.Root` at the cwd, with provider `tools` (default true: `md.IsDefined`) and no `--no-tools`; `connect` declares them in the first `session.update` (the
   Gemini bridge applies no other, and passes tools only with LiteLLM's `gemini_live_defer_setup`); `converse` collects
   `function_call` items from `response.output_item.done`, and at `response.done` sends each `function_call_output`
   + one `response.create` (`followUp`: its `response.created` is not an overlap; the mic stays paused). The mic and
