@@ -11,11 +11,6 @@ import (
 	"github.com/ackstorm/habla/internal/testenv"
 )
 
-func TestMain(m *testing.M) {
-	testenv.Fake() // HablaProcess
-	os.Exit(m.Run())
-}
-
 func writePID(t *testing.T, name string, pid int) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(rundir.Dir(), name), []byte(fmt.Sprintf("%d\n", pid)), 0o644); err != nil {
