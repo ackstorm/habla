@@ -22,6 +22,10 @@ const (
 	shortcutID = "dictate" // with AppID, what the desktop remembers the confirmed key under. Never change it.
 )
 
+// portalKeys are the shortcuts' Hold keycodes by ID: dictate, and send and cancel (the hotkey's modifiers + Return or
+// Escape, so with the hotkey held its Enter sends and its Esc discards). Never change the IDs.
+var portalKeys = map[string]int{shortcutID: hotkey.PortalKey, "send": hotkey.PortalSend, "cancel": hotkey.PortalCancel}
+
 // callTimeout bounds each portal method call, as GDBus's default (the old code's -1) does. Not the Response: the
 // user may take any time over the dialog. A var for tests.
 var callTimeout = 25 * time.Second
@@ -40,9 +44,11 @@ type portal struct {
 }
 
 // runPortal is KDE/GNOME Wayland hold-to-talk through the XDG GlobalShortcuts portal:
-// Activated = press, Deactivated = release, no Esc. The desktop asks once to confirm the key (trigger is only its
-// suggestion) and remembers it per AppID and shortcutID. It calls act("--start" | "--stop") for the life of the
-// process, from its own goroutine; it waits on D-Bus and on the user's dialog. A failure notifies once and returns.
+// Activated = press, Deactivated = release; the hotkey's modifiers + Return sends, + Escape discards (Hold). A hotkey
+// without modifiers gets neither: a bare Enter would be taken from every app. The desktop asks once to confirm the
+// keys (trigger is only its suggestion) and remembers them per AppID and shortcut ID. It calls
+// act("--start" | "--stop" | "--send" | "--cancel") for the life of the process, from its own goroutine; it waits on
+// D-Bus and on the user's dialog. A failure notifies once and returns.
 func runPortal(trigger string, act func(flag string)) {
 	// A connection of its own: Register must precede every other portal call on it.
 	conn, err := dbus.ConnectSessionBus()
@@ -72,8 +78,19 @@ func runPortal(trigger string, act func(flag string)) {
 		conn.AddMatchSignal(dbus.WithMatchSender(portalName), dbus.WithMatchObjectPath(portalPath),
 			dbus.WithMatchInterface(shortcuts), dbus.WithMatchMember(signal))
 	}
-	want := []shortcut{{shortcutID, map[string]dbus.Variant{"description": dbus.MakeVariant("Hold to dictate"),
-		"preferred_trigger": dbus.MakeVariant(trigger)}}}
+	bind := func(id, description, trigger string) shortcut {
+		return shortcut{id, map[string]dbus.Variant{"description": dbus.MakeVariant(description),
+			"preferred_trigger": dbus.MakeVariant(trigger)}}
+	}
+	want := []shortcut{bind(shortcutID, "Hold to dictate", trigger)}
+	if i := strings.LastIndex(trigger, "+"); i > 0 {
+		for _, s := range [][3]string{{"send", "Return", "Send the dictation (paste, then Enter)"},
+			{"cancel", "Escape", "Discard the dictation"}} {
+			if mods := trigger[:i+1]; mods+s[1] != trigger {
+				want = append(want, bind(s[0], s[2], mods+s[1]))
+			}
+		}
+	}
 	results, err = p.request("BindShortcuts", session, want, "", map[string]dbus.Variant{})
 	if err != nil {
 		portalFailed(err.Error())
@@ -90,15 +107,20 @@ func runPortal(trigger string, act func(flag string)) {
 		portalFailed("the shortcut was declined")
 		return
 	}
-	hold := hotkey.NewHold(hotkey.PortalKey, hotkey.NoEscape)
+	hold := hotkey.NewHold(hotkey.PortalKey, hotkey.PortalCancel).WithEnter(0, hotkey.PortalSend)
 	for s := range p.signals { // closed with the connection
 		name := strings.TrimPrefix(s.Name, shortcuts+".")
 		if (name != "Activated" && name != "Deactivated") || s.Path != portalPath || len(s.Body) < 3 ||
-			s.Body[0] != session || s.Body[1] != shortcutID {
+			s.Body[0] != session {
+			continue
+		}
+		id, _ := s.Body[1].(string)
+		key, ok := portalKeys[id]
+		if !ok {
 			continue
 		}
 		timestamp, _ := s.Body[2].(uint64)
-		for _, action := range hold.Feed([]hotkey.Event{hotkey.PortalEvent(name, uint32(timestamp))}) {
+		for _, action := range hold.Feed([]hotkey.Event{hotkey.PortalEvent(name, key, uint32(timestamp))}) {
 			slog.Debug("hold "+action, "source", "portal")
 			act("--" + action)
 		}

@@ -906,6 +906,24 @@ func TestSendWhileBusyPastesAndPressesEnter(t *testing.T) {
 	emptyRunDir(t)
 }
 
+func TestSendWhileRecordingPastesAndPressesEnterAfterTheStop(t *testing.T) { // the hotkey's Enter while held
+	e, _, _ := setup(t, testenv.DefaultReplies, conf)
+	if code := Main([]string{"--start"}); code != 0 {
+		t.Fatal(code)
+	}
+	testenv.WaitFor(t, "the whole recording", func() bool { return len(e.Lines("recorded")) == 1 })
+	pid := rundir.RunningPID(rundir.Listen)
+	if code := Main([]string{"--send"}); code != 0 {
+		t.Fatal(code)
+	}
+	if code := Main([]string{"--stop"}); code != 0 {
+		t.Fatal(code)
+	}
+	testenv.WaitFor(t, "the session to exit", func() bool { return !rundir.Alive(pid) })
+	want(t, e.Lines("pasted"), "wtype -M ctrl v -m ctrl", "wtype -k Return")
+	emptyRunDir(t)
+}
+
 func TestDictationIsRecordedInStatsWithoutText(t *testing.T) {
 	r := testenv.DefaultReplies
 	r.Cost = "0.001"

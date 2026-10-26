@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Event is one key press or release. Keycode is the X keycode (PortalKey for the portal's shortcut); State is the X
+// Event is one key press or release. Keycode is the X keycode (a Portal* for a portal shortcut); State is the X
 // modifier mask at the event; Time is the X server timestamp.
 type Event struct {
 	Press   bool
@@ -27,9 +27,11 @@ const (
 	Mod4    uint16 = 64
 )
 
+// The portal's shortcuts as Hold keycodes (X keycodes start at 8).
 const (
-	PortalKey = 0  // the portal's shortcut as a Hold keycode (no X keycode is 0)
-	NoEscape  = -1 // the portal has no Esc
+	PortalKey    = 0 // hold to dictate
+	PortalCancel = 1 // the hotkey's modifiers + Escape
+	PortalSend   = 2 // the hotkey's modifiers + Return
 )
 
 var modifiers = map[string]uint16{"shift": Shift, "control": Control, "ctrl": Control, "primary": Control, "alt": Mod1, "super": Mod4}
@@ -125,9 +127,10 @@ func PortalTrigger(text string) (string, error) {
 	return strings.Join(append(parts, key), "+"), nil
 }
 
-// PortalEvent turns a portal Activated / Deactivated signal into the press / release that Hold understands.
-func PortalEvent(signal string, timestamp uint32) Event {
-	return Event{Press: signal == "Activated", Keycode: PortalKey, Time: timestamp}
+// PortalEvent turns a portal Activated / Deactivated signal of the shortcut key (a Portal*) into the press / release
+// that Hold understands.
+func PortalEvent(signal string, key int, timestamp uint32) Event {
+	return Event{Press: signal == "Activated", Keycode: key, Time: timestamp}
 }
 
 // GrabMasks lists the four lock variants to grab: the hotkey stops working while CapsLock or NumLock is on otherwise.
@@ -153,12 +156,12 @@ func DropAutoRepeat(events []Event) []Event {
 }
 
 // Hold turns hotkey events into "start" (press), "stop" (release), "cancel" (Esc while held, or while busy) or "send"
-// (Enter while busy).
+// (Enter while busy; Enter while held is "stop" then "send").
 type Hold struct {
 	keycode, escape int
 	enter           []int  // Return and the keypad's Enter
 	mask            uint16 // the hotkey's modifiers: Enter and a <Super>Return hotkey share a keycode
-	held, cancelled bool
+	held, ended     bool   // ended: Esc or Enter ended the hold before the release
 }
 
 func NewHold(keycode, escape int) *Hold {
@@ -171,8 +174,8 @@ func (h *Hold) WithEnter(mask uint16, enter ...int) *Hold {
 	return h
 }
 
-// Active is true from the press to the release, Esc included: the keyboard stays grabbed meanwhile.
-func (h *Hold) Active() bool { return h.held || h.cancelled }
+// Active is true from the press to the release, Esc and Enter included: the keyboard stays grabbed meanwhile.
+func (h *Hold) Active() bool { return h.held || h.ended }
 
 func (h *Hold) Feed(events []Event) (actions []string) {
 	for _, e := range DropAutoRepeat(events) {
@@ -181,8 +184,11 @@ func (h *Hold) Feed(events []Event) (actions []string) {
 			h.held = true
 			actions = append(actions, "start")
 		case e.Press && e.Keycode == h.escape && h.held:
-			h.held, h.cancelled = false, true
+			h.held, h.ended = false, true
 			actions = append(actions, "cancel")
+		case e.Press && slices.Contains(h.enter, e.Keycode) && e.Keycode != h.keycode && h.held:
+			h.held, h.ended = false, true
+			actions = append(actions, "stop", "send")
 		case e.Press && e.Keycode == h.escape && !h.Active(): // Esc reaches Habla unheld only while busy
 			actions = append(actions, "cancel")
 		case e.Press && slices.Contains(h.enter, e.Keycode) && !h.Active(): // so does Enter
@@ -191,7 +197,7 @@ func (h *Hold) Feed(events []Event) (actions []string) {
 			if h.held {
 				actions = append(actions, "stop")
 			}
-			h.held, h.cancelled = false, false
+			h.held, h.ended = false, false
 		}
 	}
 	return actions

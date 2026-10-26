@@ -182,10 +182,36 @@ func TestPortalTrigger(t *testing.T) {
 }
 
 func TestPortalActivatedStartsAndDeactivatedStops(t *testing.T) {
-	h := NewHold(PortalKey, NoEscape)
-	feed(t, h, []string{"start"}, PortalEvent("Activated", 10))
-	feed(t, h, nil, PortalEvent("Activated", 20)) // a repeated Activated while held
-	feed(t, h, []string{"stop"}, PortalEvent("Deactivated", 900))
-	feed(t, h, nil, PortalEvent("Deactivated", 950))
-	feed(t, h, []string{"start"}, PortalEvent("Activated", 1000))
+	h := NewHold(PortalKey, PortalCancel)
+	feed(t, h, []string{"start"}, PortalEvent("Activated", PortalKey, 10))
+	feed(t, h, nil, PortalEvent("Activated", PortalKey, 20)) // a repeated Activated while held
+	feed(t, h, []string{"stop"}, PortalEvent("Deactivated", PortalKey, 900))
+	feed(t, h, nil, PortalEvent("Deactivated", PortalKey, 950))
+	feed(t, h, []string{"start"}, PortalEvent("Activated", PortalKey, 1000))
+}
+
+func TestEnterWhileHeldStopsAndSends(t *testing.T) {
+	const enter = 36
+	h := NewHold(space, esc).WithEnter(0, enter)
+	feed(t, h, []string{"start"}, press(space, 1))
+	feed(t, h, []string{"stop", "send"}, press(enter, 2), release(enter, 3))
+	active(t, h, true) // the keyboard stays grabbed until the hotkey is released
+	feed(t, h, nil, release(space, 4))
+	active(t, h, false)
+
+	p := NewHold(PortalKey, PortalCancel).WithEnter(0, PortalSend) // <Super>Return while <Super>space is held
+	feed(t, p, []string{"start"}, PortalEvent("Activated", PortalKey, 10))
+	feed(t, p, []string{"stop", "send"}, PortalEvent("Activated", PortalSend, 20),
+		PortalEvent("Deactivated", PortalSend, 30))
+	feed(t, p, nil, PortalEvent("Deactivated", PortalKey, 40))
+	feed(t, p, []string{"send"}, PortalEvent("Activated", PortalSend, 50)) // while busy
+	feed(t, p, []string{"cancel"}, PortalEvent("Activated", PortalCancel, 60))
+}
+
+func TestHotkeysOwnEnterWhileHeldIsNotASend(t *testing.T) { // <Super>Return repeating while held
+	const enter = 36
+	h := NewHold(enter, esc).WithEnter(Mod4, enter)
+	feed(t, h, []string{"start"}, Event{Press: true, Keycode: enter, State: Mod4, Time: 1})
+	feed(t, h, nil, Event{Press: true, Keycode: enter, State: Mod4, Time: 2})
+	feed(t, h, []string{"stop"}, release(enter, 3))
 }

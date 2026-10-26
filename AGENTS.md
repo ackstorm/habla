@@ -33,7 +33,7 @@ Push-to-dictate for the Linux desktop through OpenAI-compatible, Gemini or Eleve
   Setsid and waits (15 s) for `Habla tray started (pid N)` on fd 3 (`HABLA_TRAY_READY`, written after `newTray`); else lock → `gtk.Load` → indicator, menu, `cue-{start,stop,send}.wav` in the runtime dir (the hotkey's `act` plays them via `desktop.Player` when `tray.sound`), `refresh` from `rundir.ReadState` + `config.Load`,
   `habla listen <flag>` one at a time, reaped by a goroutine → `gtk.Idle`), `hotkey_x11.go` (xgb grab on its own
   connection, Esc via `GrabKeyboard` while held, `xembedTray`), `portal.go` (`runPortal`: KDE/GNOME Wayland
-  GlobalShortcuts on its own session-bus connection, `Register` → `CreateSession` → `BindShortcuts` → `Hold`; one
+  GlobalShortcuts on its own session-bus connection, `Register` → `CreateSession` → `BindShortcuts` (dictate, plus send/cancel = the hotkey's modifiers + Return/Escape, `portalKeys`) → `Hold`; one
   goroutine for the process), `watch.go` (inotify on the runtime and config dirs).
   `init` locks the main OS thread for GTK. Icons are extracted to `$XDG_RUNTIME_DIR/habla/icons/hicolor/...`.
 - `internal/config`: `Load()` = `[general]` / `[tray]` (hotkey, paste, paste_enter: tray only; `habla listen` uses
@@ -71,7 +71,7 @@ Push-to-dictate for the Linux desktop through OpenAI-compatible, Gemini or Eleve
   or part files after that (a new session may own them). Tests that hold the fake gateway (`Replies.HoldSTT/HoldChat`)
   register `release` after `setup`: the server's `Close` waits for held requests, and cleanups run last-in first-out.
 - The tray grabs Esc, Return and KP_Enter on X11 only while the state is `busy` or `transform` (`grabBusyKeys`); `Hold.Feed` maps an
-  unheld Esc to cancel and an unheld Enter to send (`habla listen --send` → `rundir.SendMark`, read and removed by `deliver`:
+  unheld Esc to cancel, an unheld Enter to send and a held Enter to stop + send (`habla listen --send`, also accepted while recording → `rundir.SendMark`, read and removed by `deliver`:
   paste + Enter; a new session removes a stale one). `Event.State` tells a plain Enter from a `<Super>Return` hotkey.
   After a send the tray's `lockFocus` grabs the keyboard and pointer through `copying`, until `pasting` (or 60 s); XTEST keys
   go to a grabbing client, so `pasteX11` first waits (`waitUngrabbed`, 1 s) until no client holds the keyboard.

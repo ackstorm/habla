@@ -186,10 +186,11 @@ Hold the hotkey to record, release to transcribe. Default `Super+Space` (`hotkey
 
 Press again while Habla is still transcribing or transforming (amber icon) to continue the same dictation: it drops a
 running transform, waits for the last part, transforms the joined text once and copies it. Esc while transcribing or
-transforming discards the whole dictation (X11; elsewhere `habla listen --cancel`), and Enter pastes it and presses
-Enter once it is ready, whatever the paste setting (X11; elsewhere `habla listen --send`). After Enter, Habla holds
-the keyboard and mouse until it pastes (at most 60 s), so the focus stays on the window you dictated for; Esc still
-cancels.
+transforming discards the whole dictation, and Enter pastes it and presses Enter once it is ready, whatever the paste
+setting; Enter while still holding the hotkey stops and sends at once. On KDE and GNOME Wayland these are the
+hotkey's modifiers plus Enter or Esc (`Super+Enter`, `Super+Esc`: keep Super down after letting go of Space); on sway
+and Hyprland bind `habla listen --send` / `--cancel` (below). After Enter on X11, Habla holds the keyboard and mouse
+until it pastes (at most 60 s), so the focus stays on the window you dictated for; Esc still cancels.
 
 Dictation splits automatically by default (`[split] enabled = true`, `after = 10`, `pause = 1`). Audio uploads
 while you speak; a one-second pause ends a segment once it has lasted at least ten seconds. The timer restarts
@@ -208,21 +209,26 @@ the tray says so; middle-click still works.
 
     bindsym $mod+space exec habla listen --start    # add --paste or --paste_enter to paste
     bindsym --release $mod+space exec habla listen --stop
+    bindsym $mod+Return exec habla listen --send    # replaces sway's default terminal binding
+    bindsym $mod+Escape exec habla listen --cancel
 
 **Hyprland** (`~/.config/hypr/hyprland.conf`):
 
     bind  = SUPER, space, exec, habla listen --start
     bindr = SUPER, space, exec, habla listen --stop
+    bind  = SUPER, Return, exec, habla listen --send
+    bind  = SUPER, Escape, exec, habla listen --cancel
 
 **KDE Plasma 5.27+ and GNOME 48+ on Wayland:** `habla tray` asks the desktop through the XDG GlobalShortcuts portal.
-The first time, a dialog proposes `hotkey`; you may pick another key. Afterwards change it in *System Settings →
+The first time, a dialog proposes `hotkey`, plus its modifiers with Enter (send) and Esc (discard); you may pick other
+keys. A hotkey without modifiers gets no send or discard shortcut. Afterwards change it in *System Settings →
 Shortcuts → Habla* (KDE) or *Settings → Apps → Habla* (GNOME). The portal identifies Habla by
 `~/.local/share/applications/io.github.ackstorm.Habla.desktop`: leave it there.
 
 Without the portal (older desktop) or if you decline the dialog there is no hold-to-talk. Bind a shortcut to
 `habla listen --toggle` (press once to start, again to stop): KDE *System Settings → Shortcuts → Add New → Command or
 Script…*, GNOME *Settings → Keyboard → Custom Shortcuts → +*. If a shortcut does nothing, use the full path from
-`command -v habla`. Wayland has no Esc: discard with *Discard dictation* in the tray menu or `habla listen --cancel`.
+`command -v habla`. Discard with *Discard dictation* in the tray menu or `habla listen --cancel`.
 
 ### Paste
 

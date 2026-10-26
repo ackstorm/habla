@@ -20,14 +20,17 @@ type shortcut struct {
 }
 
 // portalKeys follow a bound shortcut: a press, a repeated press, a release, a second press and release, then a key
-// for another shortcut and one for another session (session set).
+// for another shortcut and one for another session (session set), then a press that send ends (stop + send) and
+// a cancel.
 var portalKeys = []struct {
 	signal, id string
 	time       uint64
 	session    dbus.ObjectPath
 }{{"Activated", "dictate", 10, ""}, {"Activated", "dictate", 20, ""}, {"Deactivated", "dictate", 900, ""},
 	{"Activated", "dictate", 1000, ""}, {"Deactivated", "dictate", 1500, ""}, {"Activated", "other", 1600, ""},
-	{"Activated", "dictate", 1700, portalPath + "/session/other/habla"}}
+	{"Activated", "dictate", 1700, portalPath + "/session/other/habla"}, {"Activated", "dictate", 1800, ""},
+	{"Activated", "send", 1900, ""}, {"Deactivated", "send", 1950, ""}, {"Deactivated", "dictate", 2000, ""},
+	{"Activated", "cancel", 2100, ""}, {"Deactivated", "cancel", 2150, ""}}
 
 type portal struct {
 	conn *dbus.Conn

@@ -9,6 +9,10 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 - The tray also plays a short "pip" when Enter sends a dictation (paste, then Enter); `[tray] sound = false` mutes it
   with the others.
+- KDE and GNOME on Wayland get send and discard: the portal also binds the hotkey's modifiers plus Enter and Esc
+  (`Super+Enter`, `Super+Esc`); the desktop asks once to confirm them. The README shows the sway and Hyprland lines.
+- Enter while the hotkey is still held stops and sends at once (X11 and the portal), and `habla listen --send` is
+  accepted while recording.
 
 ## [0.1.8] - 2026-10-26
 

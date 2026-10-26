@@ -204,10 +204,12 @@ func signalRecording(sig syscall.Signal) int {
 	return 0
 }
 
-// markSend is --send (the tray's Enter while busy). ponytail: a mark that lands after deliver has looked is unused;
-// the next session removes it.
+// markSend is --send (the tray's Enter while busy, or with the hotkey held: that --stop comes first, so the session
+// may still be recording). ponytail: a mark that lands after deliver has looked is unused; the next session removes
+// it.
 func markSend() int {
-	if rundir.RunningPID(rundir.Listen) == 0 || !rundir.Processing(rundir.ReadState()) {
+	state := rundir.ReadState()
+	if rundir.RunningPID(rundir.Listen) == 0 || state != "recording" && !rundir.Processing(state) {
 		fmt.Fprintln(os.Stderr, "Not busy")
 		return 1
 	}

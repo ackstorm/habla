@@ -91,7 +91,7 @@ func TestPortalHoldToTalk(t *testing.T) {
 	e, notes := portalEnv(t, "bind")
 	acts := make(chan string, 10)
 	go runPortal("LOGO+space", func(flag string) { acts <- flag })
-	for _, want := range []string{"--start", "--stop", "--start", "--stop"} {
+	for _, want := range []string{"--start", "--stop", "--start", "--stop", "--start", "--stop", "--send", "--cancel"} {
 		select {
 		case got := <-acts:
 			if got != want {
@@ -107,7 +107,9 @@ func TestPortalHoldToTalk(t *testing.T) {
 	case <-time.After(200 * time.Millisecond):
 	}
 	want := []string{"Register " + AppID, "Get org.freedesktop.portal.GlobalShortcuts version", "CreateSession",
-		"BindShortcuts dictate LOGO+space Hold to dictate"}
+		"BindShortcuts dictate LOGO+space Hold to dictate",
+		"BindShortcuts send LOGO+Return Send the dictation (paste, then Enter)",
+		"BindShortcuts cancel LOGO+Escape Discard the dictation"}
 	if calls := e.Lines("portal"); !slices.Equal(calls, want) {
 		t.Errorf("portal calls %q, want %q", calls, want)
 	}

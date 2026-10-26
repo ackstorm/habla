@@ -127,6 +127,13 @@ func (h *x11Hotkey) unlockFocus(keyboard bool) {
 	xproto.GetInputFocus(h.conn).Reply() // a round trip: the grabs are gone when this returns
 }
 
+// locked is true while the focus lock holds the keyboard and pointer.
+func (h *x11Hotkey) locked() bool {
+	h.lockMu.Lock()
+	defer h.lockMu.Unlock()
+	return h.lockTimer != nil
+}
+
 // close releases the grabs and ends the loop.
 func (h *x11Hotkey) close() { h.conn.Close() }
 
@@ -167,7 +174,7 @@ func (h *x11Hotkey) loop(root xproto.Window, hold *hotkey.Hold, act func(string)
 		if active := hold.Active(); active && !grabbed {
 			h.unlockFocus(false) // the hold's own keyboard grab takes over
 			xproto.GrabKeyboard(h.conn, false, root, xproto.TimeCurrentTime, xproto.GrabModeAsync, xproto.GrabModeAsync).Reply()
-		} else if grabbed && !active {
+		} else if grabbed && !active && !h.locked() { // Enter while held: the focus lock keeps the keyboard
 			xproto.UngrabKeyboard(h.conn, xproto.TimeCurrentTime)
 		}
 		grabbed = hold.Active()
