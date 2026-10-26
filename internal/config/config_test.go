@@ -82,8 +82,8 @@ func TestFirstRunWritesTheDefaultFile(t *testing.T) {
 	if data, err := os.ReadFile(Path()); err != nil || string(data) != DefaultTOML {
 		t.Fatalf("default file not written: %v", err)
 	}
-	if c.MaxSeconds != 300 || c.TrimBelowDB != -45 || c.Tray.Hotkey != "<Super>space" {
-		t.Fatalf("general: %+v", c.General)
+	if c.MaxSeconds != 300 || c.TrimBelowDB != -45 || c.Tray.Hotkey != "<Super>space" || !c.Tray.Sound {
+		t.Fatalf("general: %+v, tray: %+v", c.General, c.Tray)
 	}
 	if c.Split != (Split{Enabled: true, After: 10, Pause: 1}) {
 		t.Fatalf("split: %+v", c.Split)

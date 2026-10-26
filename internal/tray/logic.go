@@ -4,6 +4,7 @@ package tray
 
 import (
 	"embed"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -15,6 +16,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/ackstorm/habla/internal/audio"
 	"github.com/ackstorm/habla/internal/config"
 	"github.com/ackstorm/habla/internal/desktop"
 	"github.com/ackstorm/habla/internal/rundir"
@@ -110,6 +112,24 @@ func WriteIcons(base string) (string, error) {
 		}
 	}
 	return dir, nil
+}
+
+// Cue is a 16 kHz WAV of one 60 ms note per hz, 40 ms apart, at a quarter of full scale and faded in and out over
+// 10 ms so they don't click: the hotkey plays one when it starts recording and another when it stops (tray.sound).
+func Cue(hz ...float64) []byte {
+	const n, gap, fade = audio.Rate * 60 / 1000, audio.Rate * 40 / 1000, audio.Rate * 10 / 1000
+	var pcm []byte
+	for k, f := range hz {
+		if k > 0 {
+			pcm = append(pcm, make([]byte, 2*gap)...)
+		}
+		for i := range n {
+			gain := min(1, float64(i)/fade, float64(n-1-i)/fade)
+			v := 0.25 * math.MaxInt16 * gain * math.Sin(2*math.Pi*f*float64(i)/audio.Rate)
+			pcm = binary.LittleEndian.AppendUint16(pcm, uint16(int16(v)))
+		}
+	}
+	return append(audio.HeaderAt(audio.Rate, int64(len(pcm))), pcm...)
 }
 
 // PortalDesktop is true on KDE or GNOME under Wayland: hold-to-talk goes through the GlobalShortcuts portal. sway

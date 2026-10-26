@@ -20,6 +20,17 @@ func Wayland() bool {
 	return os.Getenv("WAYLAND_DISPLAY") != "" || os.Getenv("XDG_SESSION_TYPE") == "wayland"
 }
 
+// Player finds pw-play (PipeWire), else paplay (PulseAudio).
+func Player() (string, error) {
+	player, err := exec.LookPath("pw-play")
+	if err != nil {
+		if player, err = exec.LookPath("paplay"); err != nil {
+			return "", errors.New("no player: install pipewire-bin (pw-play) or pulseaudio-utils (paplay)")
+		}
+	}
+	return player, nil
+}
+
 // Copy puts text on the CLIPBOARD selection with wl-copy (Wayland) or xclip (X11).
 func Copy(text string) error {
 	name, args, pkg := "xclip", []string{"-selection", "clipboard"}, "xclip"

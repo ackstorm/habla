@@ -203,6 +203,11 @@ func newTray(cfg *config.Config) (*tray, error) {
 	if _, err := WriteIcons(icons); err != nil {
 		return nil, err
 	}
+	for flag, hz := range cues {
+		if err := os.WriteFile(cueFile(flag), Cue(hz...), 0o600); err != nil {
+			return nil, err
+		}
+	}
 	t := &tray{startLabel: "Start dictation", cfg: cfg}
 	t.indicator = gtk.IndicatorNew("habla", "habla-idle-symbolic", gtk.CategoryApplicationStatus)
 	gtk.IndicatorSetIconThemePath(t.indicator, icons)
@@ -224,10 +229,33 @@ func newTray(cfg *config.Config) (*tray, error) {
 	return t, nil
 }
 
+// cues are the hotkey's two-note tones (tray.sound): rising "pin-pin" as it starts recording, falling "pon-pon" as it
+// stops, so a press that missed the hotkey is heard at once.
+var cues = map[string][]float64{"--start": {880, 1175}, "--stop": {587, 440}}
+
+// cueFile is where newTray writes the tone for flag: cue-start.wav, cue-stop.wav.
+func cueFile(flag string) string { return filepath.Join(rundir.Dir(), "cue"+flag[1:]+".wav") }
+
+// cue plays flag's tone when tray.sound is on, without waiting for it; with no player it stays silent.
+func (t *tray) cue(flag string) {
+	if _, ok := cues[flag]; !ok || !t.cfg.Tray.Sound {
+		return
+	}
+	player, err := desktop.Player()
+	if err == nil {
+		cmd := exec.Command(player, cueFile(flag))
+		if err = cmd.Start(); err == nil {
+			go cmd.Wait()
+			return
+		}
+	}
+	slog.Debug("no cue", "err", err)
+}
+
 // grab sets up hold-to-talk: the X11 hotkey, the portal shortcut on KDE/GNOME Wayland, or nothing on sway and
 // Hyprland (one notification says why when it can't).
 func (t *tray) grab(text string) {
-	act := func(flag string) { gtk.Idle(func() { t.held = flag == "--start"; t.listen(flag) }) }
+	act := func(flag string) { gtk.Idle(func() { t.cue(flag); t.held = flag == "--start"; t.listen(flag) }) }
 	if PortalDesktop() {
 		trigger, err := hotkey.PortalTrigger(text)
 		if err != nil {

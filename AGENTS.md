@@ -24,13 +24,13 @@ Push-to-dictate for the Linux desktop through OpenAI-compatible, Gemini or Eleve
 - `internal/say`: `habla say`. `config.TTS.Delivery` selects the style voice/instructions and warns if a style is inactive. One `gateway.Speak` request → `--out FILE`, or
   `say.wav` played by `pw-play`/`paplay` while holding `say.pid` (no `state`); SIGTERM (`--stop`) terminates the player, exit 0.
 - `internal/hotkey`: pure hold-to-talk logic: `Parse`/`Label`/`PortalTrigger`, `Keysym` table, `GrabMasks`, `DropAutoRepeat`, `PortalEvent`, `Hold` (`Event` slices → start/stop/cancel; `Active()`).
-- `internal/tray` (`logic.go`): pure tray helpers (`AcquireLock`, `Install{Autostart,DesktopEntry}`, `Levels`, `PillHint`, `PlacePill`, `MenuChoices`, `EnqueueListen`, `PortalDesktop`, `HablaPath`, `AppID`), `Icons` (embedded SVGs). No GTK in `logic.go`; `config.SaveChoice` writes the menu choice into config.toml.
+- `internal/tray` (`logic.go`): pure tray helpers (`AcquireLock`, `Install{Autostart,DesktopEntry}`, `Levels`, `PillHint`, `PlacePill`, `MenuChoices`, `EnqueueListen`, `PortalDesktop`, `HablaPath`, `AppID`, `Cue`), `Icons` (embedded SVGs). No GTK in `logic.go`; `config.SaveChoice` writes the menu choice into config.toml.
   `pill.go`: the recording pill, shown/hidden by `refresh` from `state` (so every way to record shows it): an X11
   POPUP placed by `PlacePill` on the active window's monitor, a layer-shell overlay, or (Wayland without layer-shell)
   the `notice` (`desktop.Critical` → `CloseNotification`).
 - `internal/tray` (GTK side): `tray.go` `Main` (`--install-autostart` = autostart + portal entry + icons in
   `~/.local/share/icons`; without `--foreground`: lock check → `startBackground` re-runs `tray --foreground` with
-  Setsid and waits (15 s) for `Habla tray started (pid N)` on fd 3 (`HABLA_TRAY_READY`, written after `newTray`); else lock → `gtk.Load` → indicator, menu, `refresh` from `rundir.ReadState` + `config.Load`,
+  Setsid and waits (15 s) for `Habla tray started (pid N)` on fd 3 (`HABLA_TRAY_READY`, written after `newTray`); else lock → `gtk.Load` → indicator, menu, `cue-{start,stop}.wav` in the runtime dir (the hotkey's `act` plays them via `desktop.Player` when `tray.sound`), `refresh` from `rundir.ReadState` + `config.Load`,
   `habla listen <flag>` one at a time, reaped by a goroutine → `gtk.Idle`), `hotkey_x11.go` (xgb grab on its own
   connection, Esc via `GrabKeyboard` while held, `xembedTray`), `portal.go` (`runPortal`: KDE/GNOME Wayland
   GlobalShortcuts on its own session-bus connection, `Register` → `CreateSession` → `BindShortcuts` → `Hold`; one

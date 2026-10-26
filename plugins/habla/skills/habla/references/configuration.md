@@ -22,6 +22,7 @@ log_level = "warn"
 hotkey = "<Super>space"
 paste = false
 paste_enter = false
+sound = true
 
 [llm]
 provider = "openai"
@@ -242,7 +243,8 @@ microphone or speaker behavior.
 
 Absent `[general]` keys use the example's values. `paste_keys` accepts `auto`, `ctrl+v`, or `ctrl+shift+v`;
 `log_level` accepts `error`, `warn`, `info`, or `debug`. Preserve existing recording/hotkey choices.
-`[tray]` holds `hotkey`, `paste` and `paste_enter` (Enter after pasting; needs `paste`). Only `habla tray` reads
+`[tray]` holds `hotkey`, `paste`, `paste_enter` (Enter after pasting; needs `paste`) and `sound` (default `true`: a
+short tone as the hotkey starts and stops recording). Only `habla tray` reads
 them; `habla listen` takes `--paste` / `--paste_enter`. Old `[general] hotkey` / `paste` are errors ("moved to
 tray.KEY"): move those lines into `[tray]`.
 `upload_interval_ms` is an integer from 50 to 1000 (default 50): the audio upload polling interval during

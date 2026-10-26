@@ -35,6 +35,7 @@ log_level     = "warn"               # error | warn | info | debug, in ~/.local/
 hotkey        = "<Super>space"
 paste         = false                # true = also paste into the focused window
 paste_enter   = false                # true = and press Enter after pasting (needs paste)
+sound         = true                 # a short tone when the hotkey starts and stops recording
 
 # Each service is optional: without [llm] no transform, without [stt] no dictation, without [tts] no habla say,
 # without [live] no habla live. A service has one or more [<service>.providers.<name>] (names: letters, digits, -
@@ -252,6 +253,7 @@ type Tray struct {
 	Hotkey     string `toml:"hotkey"`
 	Paste      bool   `toml:"paste"`
 	PasteEnter bool   `toml:"paste_enter"`
+	Sound      bool   `toml:"sound"`
 }
 
 type General struct {

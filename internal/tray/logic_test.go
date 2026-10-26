@@ -264,6 +264,31 @@ func TestHablaPathIsAbsolute(t *testing.T) {
 	}
 }
 
+func TestCue(t *testing.T) {
+	wav := Cue(880, 1175)
+	pcm := wav[44:]
+	if len(pcm) != 2*(960+640+960) || binary.LittleEndian.Uint32(wav[40:]) != uint32(len(pcm)) {
+		t.Fatalf("want two 60 ms notes 40 ms apart at 16 kHz, got %d bytes, header size %d", len(pcm),
+			binary.LittleEndian.Uint32(wav[40:]))
+	}
+	sample := func(i int) int { return int(int16(binary.LittleEndian.Uint16(pcm[2*i:]))) }
+	peak := 0
+	for i := range len(pcm) / 2 {
+		peak = max(peak, sample(i), -sample(i))
+	}
+	if peak < 7000 || peak > 8200 {
+		t.Fatalf("peak %d, want about a quarter of full scale", peak)
+	}
+	if first, last := sample(1), sample(len(pcm)/2-1); max(first, -first) > 500 || max(last, -last) > 500 {
+		t.Fatalf("not faded: first %d, last %d", first, last)
+	}
+	for i := 960; i < 960+640; i++ {
+		if sample(i) != 0 {
+			t.Fatalf("sample %d in the gap is %d", i, sample(i))
+		}
+	}
+}
+
 func TestPortalDesktop(t *testing.T) {
 	for _, c := range []struct {
 		session, display, current string

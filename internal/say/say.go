@@ -189,11 +189,9 @@ func play(client *gateway.Client, tts *config.TTS, voice, instructions, text str
 
 // run plays wav with pw-play (PipeWire), else paplay (PulseAudio); cancelling ctx terminates the player and waits for it.
 func run(ctx context.Context, wav string) error {
-	player, err := exec.LookPath("pw-play")
+	player, err := desktop.Player()
 	if err != nil {
-		if player, err = exec.LookPath("paplay"); err != nil {
-			return errors.New("no player: install pipewire-bin (pw-play) or pulseaudio-utils (paplay)")
-		}
+		return err
 	}
 	slog.Info("player", "tool", filepath.Base(player))
 	cmd := exec.CommandContext(ctx, player, wav)

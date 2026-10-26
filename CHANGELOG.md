@@ -5,6 +5,11 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Added
+
+- The tray plays a rising two-note tone when the hotkey starts recording and a falling one when it stops, so a press
+  that missed the hotkey (Space a moment before Super) is heard at once. `[tray] sound = false` turns it off.
+
 ### Changed
 
 - The tray menu always shows *STT provider* and *LLM provider*, with the active one ticked, even when only one is

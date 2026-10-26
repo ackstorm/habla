@@ -76,8 +76,9 @@ also take `--style NAME` (a `[styles.*]` name, or `""` for none) to override the
 
 `~/.config/habla/config.toml` is yours: Habla writes it on first run only and re-reads it at each recording. Invalid
 files stop the command with a line-numbered error; unknown keys are errors. `[general]` holds the recording
-limit, silence threshold, upload interval, paste keys and log level; `[tray]` holds `hotkey`, `paste` and
-`paste_enter`, which only `habla tray` reads (`habla listen` takes `--paste` / `--paste_enter`).
+limit, silence threshold, upload interval, paste keys and log level; `[tray]` holds `hotkey`, `paste`,
+`paste_enter` and `sound` (a rising two-note tone as the hotkey starts recording and a falling one as it stops, so a
+missed press is heard at once; `false` = silent), which only `habla tray` reads (`habla listen` takes `--paste` / `--paste_enter`).
 
 ```toml
 [stt]
