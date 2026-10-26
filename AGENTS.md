@@ -86,7 +86,7 @@ Push-to-dictate for the Linux desktop through OpenAI-compatible, Gemini or Eleve
   create, rename, delete or close-after-write.
 
 - The test binary is not named `habla`, so `rundir.Alive` rejects it: in-process sessions are not "recording" to
-  `ReadState`. Tests wait for `listen.pid` instead, and use `testenv.HablaProcess` (sleep via a `habla` link)
+  `ReadState`. Tests wait for `listen.pid` instead, and use `testenv.HablaProcess` (`sh -c '/bin/sleep 60; :' habla`: never `/bin/sleep` through a `habla` link, which uutils coreutils on Ubuntu 26.04 dispatches by name and exits; never the Go test binary, which ignores SIGUSR1)
   as a live holder. `listen.Self` points `--start` at the `habla` link, which `TestMain` dispatches to `Main`.
 - `cmd.Start()` returning does not guarantee `/proc/<pid>/cmdline` is set: `testenv.HablaProcess` waits (bounded)
   for a non-empty cmdline before `rundir.Alive` can see the child.
