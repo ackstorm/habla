@@ -5,6 +5,8 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-10-28
+
 ### Added
 
 - On X11, the pointer turns into the cursor theme's wait cursor from the release of the hotkey until the paste, and
@@ -157,7 +159,8 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 - `habla` skill for Claude Code and Codex: configuration and spoken replies via `habla say`.
 - One static binary (amd64, arm64) installed by `install.sh` with checksum verification and tray autostart.
 
-[Unreleased]: https://github.com/ackstorm/habla/compare/v0.1.13...HEAD
+[Unreleased]: https://github.com/ackstorm/habla/compare/v0.1.14...HEAD
+[0.1.14]: https://github.com/ackstorm/habla/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/ackstorm/habla/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/ackstorm/habla/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/ackstorm/habla/compare/v0.1.10...v0.1.11
