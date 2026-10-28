@@ -157,6 +157,8 @@ already running it says so and exits 1. Its output goes to the log. Upgrading wi
 The icon shows the state: a microphone when idle, a red square while recording (with the elapsed time, where the
 panel shows labels), amber while transcribing, a red microphone after a failed transcription. Middle-click starts or
 stops a dictation; right-click opens the menu. Only one tray runs at a time. *Quit* leaves a recording running.
+On X11, from the release of the hotkey until the paste, the pointer shows the wait cursor and clicks are held back (at
+most 15 s), so the text lands in the window you dictated for; the keyboard stays free.
 
 While recording, a slim white bar on the monitor of the active window shows **Listening**, a pulsing rose dot,
 and a lavender waveform with 28 audio-driven peak bars in the left 30% of the bar. The text, timer and ESC share

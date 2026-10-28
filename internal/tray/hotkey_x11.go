@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ackstorm/habla/internal/desktop"
+	"github.com/ackstorm/habla/internal/gtk"
 	"github.com/ackstorm/habla/internal/hotkey"
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
@@ -22,6 +23,9 @@ const autoRepeatGap = 20 * time.Millisecond
 
 // maxFocusLock bounds the focus lock after Enter, in case the dictation never leaves busy or transform.
 const maxFocusLock = 60 * time.Second
+
+// maxWaitCursor bounds the wait cursor while Habla works, in case the gateway hangs: then the mouse comes back.
+const maxWaitCursor = 15 * time.Second
 
 var errTaken = errors.New("taken by another app")
 
@@ -40,6 +44,8 @@ type x11Hotkey struct {
 	escape, enter, kpEnter xproto.Keycode
 	lockMu                 sync.Mutex
 	lockTimer              *time.Timer // non-nil while Enter holds the keyboard and pointer (lockFocus)
+	waitCursor             xproto.Cursor
+	waitTimer              *time.Timer // non-nil while the wait cursor holds the pointer (showWait)
 }
 
 // grabX11 grabs text (`<Super>space`) and calls act("--start" | "--stop" | "--cancel" | "--send") from its goroutine.
@@ -75,7 +81,8 @@ func grabX11(text string, act func(flag string)) (*x11Hotkey, error) {
 			return nil, noDisplay{err}
 		}
 	}
-	h := &x11Hotkey{conn: conn, root: root, escape: codes[keysymEscape], enter: codes[keysymReturn], kpEnter: codes[keysymKPEnter]}
+	h := &x11Hotkey{conn: conn, root: root, escape: codes[keysymEscape], enter: codes[keysymReturn], kpEnter: codes[keysymKPEnter],
+		waitCursor: waitCursor()}
 	go h.loop(root, hotkey.NewHold(int(code), int(h.escape)).WithEnter(mask, int(h.enter), int(h.kpEnter)), act)
 	return h, nil
 }
@@ -107,7 +114,8 @@ func (h *x11Hotkey) lockFocus() {
 		return
 	}
 	xproto.GrabKeyboard(h.conn, false, h.root, xproto.TimeCurrentTime, xproto.GrabModeAsync, xproto.GrabModeAsync).Reply()
-	xproto.GrabPointer(h.conn, false, h.root, 0, xproto.GrabModeAsync, xproto.GrabModeAsync, 0, 0, xproto.TimeCurrentTime).Reply()
+	h.stopWait() // the focus lock takes the pointer over, with the same cursor, for longer
+	xproto.GrabPointer(h.conn, false, h.root, 0, xproto.GrabModeAsync, xproto.GrabModeAsync, 0, h.waitCursor, xproto.TimeCurrentTime).Reply()
 	h.lockTimer = time.AfterFunc(maxFocusLock, func() { h.unlockFocus(true) })
 }
 
@@ -132,6 +140,55 @@ func (h *x11Hotkey) locked() bool {
 	h.lockMu.Lock()
 	defer h.lockMu.Unlock()
 	return h.lockTimer != nil
+}
+
+// showWait grabs the pointer with the wait cursor while Habla transcribes, refines, copies and pastes: the cursor
+// shows Habla is working everywhere on screen, and a click can't move the focus away from where the paste goes.
+// The keyboard stays free. It ends at idle (the tray's refresh) or after maxWaitCursor. A grab another client holds
+// (an open menu) is refused: no wait cursor this time.
+func (h *x11Hotkey) showWait() {
+	h.lockMu.Lock()
+	defer h.lockMu.Unlock()
+	if h.waitTimer != nil || h.lockTimer != nil {
+		return
+	}
+	r, err := xproto.GrabPointer(h.conn, false, h.root, 0, xproto.GrabModeAsync, xproto.GrabModeAsync, 0, h.waitCursor,
+		xproto.TimeCurrentTime).Reply()
+	if err != nil || r.Status != xproto.GrabStatusSuccess {
+		slog.Debug("no wait cursor: the pointer is grabbed")
+		return
+	}
+	h.waitTimer = time.AfterFunc(maxWaitCursor, h.endWait)
+}
+
+// endWait ends the wait cursor, if any.
+func (h *x11Hotkey) endWait() {
+	h.lockMu.Lock()
+	defer h.lockMu.Unlock()
+	h.stopWait()
+}
+
+// stopWait is endWait with lockMu held.
+func (h *x11Hotkey) stopWait() {
+	if h.waitTimer == nil {
+		return
+	}
+	h.waitTimer.Stop()
+	h.waitTimer = nil
+	xproto.UngrabPointer(h.conn, xproto.TimeCurrentTime)
+	xproto.GetInputFocus(h.conn).Reply() // a round trip: the grab is gone when this returns
+}
+
+// waitCursor is the cursor theme's "wait" (a spinner), or 0 (the pointer keeps its shape) without one. GDK loads it
+// on its own connection; a cursor ID is valid on every connection to the same server.
+func waitCursor() xproto.Cursor {
+	display := gtk.DisplayGetDefault()
+	cursor := gtk.CursorNewFromName(display, "wait")
+	if cursor == 0 {
+		return 0
+	}
+	gtk.DisplayFlush(display) // the cursor exists on the server before another connection uses it
+	return xproto.Cursor(gtk.X11CursorGetXcursor(cursor))
 }
 
 // close releases the grabs and ends the loop.

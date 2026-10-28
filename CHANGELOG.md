@@ -5,6 +5,12 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Added
+
+- On X11, the pointer turns into the cursor theme's wait cursor from the release of the hotkey until the paste, and
+  clicks are held back meanwhile, so a click can't move the paste to another window. The keyboard stays free, and
+  the mouse comes back after 15 s if the gateway hangs.
+
 ## [0.1.13] - 2026-10-26
 
 ### Added

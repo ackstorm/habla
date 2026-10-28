@@ -314,6 +314,13 @@ func (t *tray) refresh() {
 	if t.hotkey != nil && !rundir.Processing(state) && state != "copying" {
 		t.hotkey.unlockFocus(true) // the focus lock after Enter lasts until the paste
 	}
+	if t.hotkey != nil {
+		if rundir.Processing(state) || state == "copying" || state == "pasting" {
+			t.hotkey.showWait()
+		} else {
+			t.hotkey.endWait()
+		}
+	}
 	if state == "recording" && t.timer == 0 {
 		t.timer = gtk.Timeout(1000, t.tick)
 		t.setLabel()

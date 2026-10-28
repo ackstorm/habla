@@ -86,6 +86,8 @@ Push-to-dictate for the Linux desktop through OpenAI-compatible, Gemini or Eleve
   paste + Enter; a new session removes a stale one). `Event.State` tells a plain Enter from a `<Super>Return` hotkey.
   After a send the tray's `lockFocus` grabs the keyboard and pointer through `copying`, until `pasting` (or 60 s); XTEST keys
   go to a grabbing client, so `pasteX11` first waits (`waitUngrabbed`, 1 s) until no client holds the keyboard.
+  Without a send, `showWait` grabs only the pointer, with the theme's `wait` cursor (GDK loads it; its X ID works on
+  xgb's connection), from `busy` until idle (or 15 s); `lockFocus` takes the pointer over with the same cursor.
 
 - Tray hotkey auto-repeat: xgb hands events over one at a time, so a repeat's release+press pair is not always queued
   together; after a release the loop waits `autoRepeatGap` (20 ms) for the press. Xvfb auto-repeats XTEST keys, and

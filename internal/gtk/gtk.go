@@ -81,6 +81,9 @@ var (
 	DisplayGetNMonitors                 func(display uintptr) int32
 	DisplayGetMonitor                   func(display uintptr, n int32) uintptr
 	DisplayGetMonitorAtPoint            func(display uintptr, x, y int32) uintptr
+	DisplayFlush                        func(display uintptr)
+	CursorNewFromName                   func(display uintptr, name string) uintptr // 0 when the theme lacks it
+	X11CursorGetXcursor                 func(cursor uintptr) uint32                // the cursor's X ID (X11 only)
 	MonitorGetGeometry                  func(monitor uintptr, out *Rect)
 	MonitorGetWorkarea                  func(monitor uintptr, out *Rect)
 	MonitorGetScaleFactor               func(monitor uintptr) int32
@@ -151,7 +154,8 @@ var libs = []lib{
 		"gdk_display_get_n_monitors": &DisplayGetNMonitors, "gdk_display_get_monitor": &DisplayGetMonitor,
 		"gdk_display_get_monitor_at_point": &DisplayGetMonitorAtPoint,
 		"gdk_monitor_get_geometry":         &MonitorGetGeometry, "gdk_monitor_get_workarea": &MonitorGetWorkarea,
-		"gdk_monitor_get_scale_factor": &MonitorGetScaleFactor,
+		"gdk_monitor_get_scale_factor": &MonitorGetScaleFactor, "gdk_display_flush": &DisplayFlush,
+		"gdk_cursor_new_from_name": &CursorNewFromName, "gdk_x11_cursor_get_xcursor": &X11CursorGetXcursor,
 	}},
 	{"libgtk-3.so.0", "libgtk-3-0", false, map[string]any{
 		"gtk_init_check": &initCheck, "gtk_main": &Main, "gtk_main_quit": &MainQuit,

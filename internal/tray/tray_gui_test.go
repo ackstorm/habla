@@ -323,6 +323,58 @@ func TestTrayEscCancelsDuringTheFocusLockGUI(t *testing.T) {
 }
 
 // keyboardGrab tries to grab the keyboard from a connection of its own (released on close) and returns the status.
+func TestTrayWaitCursorWhileBusyGUI(t *testing.T) {
+	e, _ := guiEnv(t, "")
+	r := testenv.DefaultReplies
+	r.HoldSTT = make(chan struct{})
+	g := testenv.NewGateway(t, r)
+	e.WriteConfig(t, g, "")
+	release := sync.OnceFunc(func() { close(r.HoldSTT) })
+	defer release()
+	log, _ := startTray(t, e, true)
+	waitLog(t, log, "No tray to show Habla's icon")
+
+	xdo(t, "keydown", "super+space")
+	testenv.WaitFor(t, "recording", recording)
+	recordedEnough(t)
+	if got := pointerGrab(t); got != xproto.GrabStatusSuccess {
+		t.Errorf("pointer grab while recording = %d, want the mouse free (Success)", got)
+	}
+	xdo(t, "keyup", "super+space")
+	testenv.WaitFor(t, "transcribing", func() bool { return rundir.ReadState() == "busy" })
+	testenv.WaitFor(t, "the wait cursor to hold the pointer", func() bool {
+		return pointerGrab(t) == xproto.GrabStatusAlreadyGrabbed
+	})
+	if got := keyboardGrab(t); got != xproto.GrabStatusSuccess {
+		t.Errorf("keyboard grab while busy = %d, want the keyboard free (Success)", got)
+	}
+	session := rundir.RunningPID(rundir.Listen)
+	release()
+	testenv.WaitFor(t, "Hola. copied", func() bool { return slices.Equal(e.Lines("copied"), []string{"Hola."}) })
+	testenv.WaitFor(t, "the session to finish delivering", func() bool { return !rundir.Alive(session) })
+	testenv.WaitFor(t, "the wait cursor to end", func() bool { return pointerGrab(t) == xproto.GrabStatusSuccess })
+	if data, _ := os.ReadFile(log); t.Failed() {
+		t.Logf("tray output:\n%s", data)
+	}
+}
+
+// pointerGrab tries to grab the pointer from a connection of its own and lets it go: AlreadyGrabbed while another
+// client holds it.
+func pointerGrab(t *testing.T) byte {
+	t.Helper()
+	conn, err := xgb.NewConn()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	root := xproto.Setup(conn).DefaultScreen(conn).Root
+	r, err := xproto.GrabPointer(conn, false, root, 0, xproto.GrabModeAsync, xproto.GrabModeAsync, 0, 0, xproto.TimeCurrentTime).Reply()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r.Status
+}
+
 func keyboardGrab(t *testing.T) byte {
 	t.Helper()
 	conn, err := xgb.NewConn()
