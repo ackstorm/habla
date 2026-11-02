@@ -16,7 +16,8 @@ import (
 // Terminals get Ctrl+Shift+V with paste_keys auto: these WM_CLASS names, or any containing "terminal".
 // IDEs with a terminal panel are deliberately not matched; set paste_keys for those.
 var terminals = []string{"terminator", "gnome-terminal", "mate-terminal", "xfce4-terminal", "konsole", "lxterminal",
-	"qterminal", "tilix", "alacritty", "kitty", "foot", "wezterm", "st", "urxvt", "xterm", "deepin-terminal"}
+	"qterminal", "tilix", "alacritty", "kitty", "foot", "wezterm", "st", "urxvt", "xterm", "deepin-terminal",
+	"herdr-app"}
 
 const (
 	keysymShiftL   xproto.Keysym = 0xffe1

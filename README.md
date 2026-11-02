@@ -256,8 +256,8 @@ On Wayland `wtype` is tried first, then `ydotool` (needs `ydotoold` and `/dev/ui
 nothing can paste, the text stays on the clipboard and the notification says *Copied: press Ctrl+V to paste*.
 
 `paste_keys = "auto"` sends `Ctrl+Shift+V` on X11 when the focused window's `WM_CLASS` is a known terminal
-(gnome-terminal, mate-terminal, konsole, alacritty, kitty, xterm, anything containing `terminal`, ...) and `Ctrl+V`
-otherwise; on Wayland always `Ctrl+V`. Set `ctrl+v` or `ctrl+shift+v` to force one.
+(gnome-terminal, mate-terminal, konsole, alacritty, kitty, xterm, herdr-app, anything containing `terminal`, ...)
+and `Ctrl+V` otherwise; on Wayland always `Ctrl+V`. Set `ctrl+v` or `ctrl+shift+v` to force one.
 
 ## Speak
 

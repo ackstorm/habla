@@ -114,6 +114,7 @@ func TestTerminalDetection(t *testing.T) {
 		"mate-terminal\x00Mate-terminal\x00": true,
 		"kitty\x00kitty\x00":                 true,
 		"tilix\x00Com.gexperts.Tilix\x00":    true,
+		"herdr-app\x00herdr-app\x00":         true,
 		"Navigator\x00firefox\x00":           false,
 		"code\x00Code\x00":                   false,
 		"":                                   false,
