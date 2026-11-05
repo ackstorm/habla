@@ -13,38 +13,78 @@ import (
 	"github.com/ackstorm/habla/internal/config"
 )
 
-// TestRunSpeaksFreshMessagesAndDeletesAll: a fresh message is spoken, an expired one is not, both are deleted, and
-// a message the server keeps listing is spoken once.
-func TestRunSpeaksFreshMessagesAndDeletesAll(t *testing.T) {
-	t.Setenv("XDG_RUNTIME_DIR", t.TempDir()) // no say.pid: nobody else is speaking
-	now := time.Now().UTC()
-	var mu sync.Mutex
-	var deleted []string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer k" {
-			w.WriteHeader(http.StatusUnauthorized)
+// fakeServer is an Artifact Server's agent and voice routes: polls answer from replies in order, then 204.
+type fakeServer struct {
+	mu          sync.Mutex
+	registered  []map[string]any
+	polls       int
+	replies     []func(w http.ResponseWriter) // one per voice poll
+	disconnects []string
+}
+
+func (f *fakeServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if r.Header.Get("Authorization") != "Bearer k" {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	switch {
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/agents":
+		var body map[string]any
+		json.NewDecoder(r.Body).Decode(&body)
+		f.registered = append(f.registered, body)
+		json.NewEncoder(w).Encode(map[string]any{"agent": map[string]any{"id": "agt_" + string(rune('0'+len(f.registered)))}})
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/agents/agt_1/disconnect",
+		r.Method == http.MethodPost && r.URL.Path == "/api/v1/agents/agt_2/disconnect":
+		f.disconnects = append(f.disconnects, r.URL.Path)
+		w.WriteHeader(http.StatusNoContent)
+	case r.Method == http.MethodPost && (r.URL.Path == "/api/v1/agents/agt_1/voice" || r.URL.Path == "/api/v1/agents/agt_2/voice"):
+		if r.URL.Query().Get("wait") == "" {
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/artifacts" && r.URL.Query().Get("tag") == "voz":
-			json.NewEncoder(w).Encode(map[string]any{"artifacts": []any{
-				map[string]any{"artifact": map[string]any{"id": "fresh2", "name": "second", "createdAt": now.Add(-time.Second), "currentVersionId": "v2"}},
-				map[string]any{"artifact": map[string]any{"id": "old", "name": "too late", "createdAt": now.Add(-2 * time.Minute), "currentVersionId": "v0"}},
-				map[string]any{"artifact": map[string]any{"id": "fresh1", "name": " first ", "createdAt": now.Add(-5 * time.Second), "currentVersionId": "v1"}},
-			}})
-		case r.Method == http.MethodDelete && len(r.Header.Get("Idempotency-Key")) >= 16:
-			var body struct{ ExpectedCurrentVersionID string }
-			json.NewDecoder(r.Body).Decode(&body)
-			mu.Lock()
-			deleted = append(deleted, r.URL.Path+"@"+body.ExpectedCurrentVersionID)
-			mu.Unlock()
-			w.WriteHeader(http.StatusForbidden) // still listed next time: must not be spoken twice
-		default:
-			w.WriteHeader(http.StatusBadRequest)
+		f.polls++
+		if len(f.replies) == 0 {
+			w.WriteHeader(http.StatusNoContent)
+			return
 		}
-	}))
+		reply := f.replies[0]
+		f.replies = f.replies[1:]
+		reply(w)
+	default:
+		w.WriteHeader(http.StatusBadRequest)
+	}
+}
+
+func messages(texts ...string) func(http.ResponseWriter) {
+	return func(w http.ResponseWriter) {
+		var m []map[string]string
+		for _, t := range texts {
+			m = append(m, map[string]string{"id": "vox_" + t, "text": t, "createdAt": "2026-11-06T00:00:00Z"})
+		}
+		json.NewEncoder(w).Encode(map[string]any{"messages": m})
+	}
+}
+
+func status(code int) func(http.ResponseWriter) {
+	return func(w http.ResponseWriter) { w.WriteHeader(code) }
+}
+
+// TestRunRegistersSpeaksAndDisconnects: habla registers as kind habla, speaks each poll's messages in order across
+// empty polls, registers again after its agent is gone, and disconnects when stopped.
+func TestRunRegistersSpeaksAndDisconnects(t *testing.T) {
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir()) // no say.pid: nobody else is speaking
+	f := &fakeServer{replies: []func(http.ResponseWriter){
+		messages(" first ", "second"),
+		status(http.StatusNoContent),
+		status(http.StatusNotFound), // the server reaped the agent
+		messages("third"),
+	}}
+	srv := httptest.NewServer(f)
 	defer srv.Close()
 
+	var mu sync.Mutex
 	var said []string
 	Speak = func(_ context.Context, text string) error {
 		mu.Lock()
@@ -52,29 +92,34 @@ func TestRunSpeaksFreshMessagesAndDeletesAll(t *testing.T) {
 		mu.Unlock()
 		return nil
 	}
-	Interval = 10 * time.Millisecond
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	Wait, Retry = 0, 10*time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
-	if err := Run(ctx, &config.Inbox{Server: srv.URL, Tag: "voz", MaxAge: 60}, "k"); err != nil {
+	if err := Run(ctx, &config.Inbox{Server: srv.URL}, "k"); err != nil {
 		t.Fatal(err)
 	}
+
 	mu.Lock()
 	defer mu.Unlock()
-	if want := []string{"first", "second"}; !slices.Equal(said, want) {
+	if want := []string{"first", "second", "third"}; !slices.Equal(said, want) {
 		t.Fatalf("said %q, want %q", said, want)
 	}
-	slices.Sort(deleted)
-	if want := []string{"/api/v1/artifacts/fresh1@v1", "/api/v1/artifacts/fresh2@v2", "/api/v1/artifacts/old@v0"}; !slices.Equal(deleted, want) {
-		t.Fatalf("deleted %q, want %q", deleted, want)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.registered) != 2 || f.registered[0]["kind"] != "habla" || f.registered[0]["connectionKey"] == "" {
+		t.Fatalf("registered %v", f.registered)
+	}
+	if !slices.Equal(f.disconnects, []string{"/api/v1/agents/agt_2/disconnect"}) {
+		t.Fatalf("disconnects %v", f.disconnects)
 	}
 }
 
 func TestRunStopsWhenTheKeyIsRefused(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusUnauthorized) }))
+	srv := httptest.NewServer(&fakeServer{})
 	defer srv.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if err := Run(ctx, &config.Inbox{Server: srv.URL, Tag: "voz", MaxAge: 60}, "bad"); err != errRefused {
+	if err := Run(ctx, &config.Inbox{Server: srv.URL}, "bad"); err != errRefused {
 		t.Fatalf("got %v, want errRefused", err)
 	}
 }

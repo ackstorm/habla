@@ -303,13 +303,11 @@ type Transform struct {
 	Prompt string `toml:"prompt"`
 }
 
-// Inbox is where habla inbox reads its messages: artifacts tagged Tag on an Artifact Server.
+// Inbox is the Artifact Server whose voice_say messages habla inbox speaks.
 type Inbox struct {
 	Enabled bool   `toml:"enabled"` // habla tray runs habla inbox while true (its menu's Inbox check)
 	Server  string `toml:"server"`  // the Artifact Server origin, https://
-	APIKey  string `toml:"api_key"` // env:VARIABLE or cmd:COMMAND; an API key with artifact:read
-	Tag     string `toml:"tag"`     // "voz" when unset
-	MaxAge  int    `toml:"max_age"` // seconds; older messages are dropped unspoken; 60 when unset
+	APIKey  string `toml:"api_key"` // env:VARIABLE or cmd:COMMAND; a member API key with agent:connect
 }
 
 type Split struct {
@@ -583,12 +581,6 @@ func decode(text string, f *file) (*Config, error) {
 		in.Server = strings.TrimSuffix(in.Server, "/")
 		if source, rest, _ := strings.Cut(in.APIKey, ":"); (source != "env" && source != "cmd") || strings.TrimSpace(rest) == "" {
 			return nil, invalid(text, "inbox", "api_key", "env:VARIABLE or cmd:COMMAND")
-		}
-		in.Tag = cmp.Or(in.Tag, "voz")
-		if !md.IsDefined("inbox", "max_age") {
-			in.MaxAge = 60
-		} else if in.MaxAge <= 0 {
-			return nil, invalid(text, "inbox", "max_age", "a positive number of seconds")
 		}
 	}
 	seconds := func(v float64) bool { return v > 0 && !math.IsInf(v, 0) } // also false for NaN

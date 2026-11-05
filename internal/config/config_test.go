@@ -654,7 +654,7 @@ func TestInboxConfiguration(t *testing.T) {
 		{strings.ReplaceAll(valid, "https://", "http://"), "inbox.server"},
 		{strings.ReplaceAll(valid, ".com/", ".com/api"), "inbox.server"},
 		{strings.ReplaceAll(valid, "cmd:pass show inbox", "as_key_literal"), "inbox.api_key"},
-		{valid + "max_age = 0\n", "inbox.max_age"},
+		{valid + "tag = \"voz\"\n", "inbox.tag"},
 	} {
 		t.Run(tc.problem+tc.text[:8], func(t *testing.T) {
 			setup(t)
@@ -669,7 +669,7 @@ func TestInboxConfiguration(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if in := c.Inbox; in == nil || in.Enabled || in.Server != "https://artifacts.example.com" || in.Tag != "voz" || in.MaxAge != 60 {
+			if in := c.Inbox; in == nil || in.Enabled || in.Server != "https://artifacts.example.com" {
 				t.Fatalf("inbox = %+v", c.Inbox)
 			}
 			if err := SaveChoice("inbox", true); err != nil {

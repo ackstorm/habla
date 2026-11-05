@@ -1,11 +1,14 @@
-// Package inbox is `habla inbox`: speak the messages other agents leave on an Artifact Server, then delete them.
+// Package inbox is `habla inbox`: speak what agents send with voice_say on an Artifact Server.
 //
-// A message is an artifact tagged [inbox] tag; its name is the text. Messages older than max_age are deleted
-// unspoken: nobody was listening when they arrived.
+// habla registers as an agent of kind habla and long-polls its voice route. The poll is its heartbeat: while it
+// runs, voice_say queues sentences for this user; otherwise voice_say queues nothing. The server hands each message
+// over once and drops it after 60 s.
 package inbox
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -16,7 +19,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -28,8 +30,11 @@ import (
 	"github.com/ackstorm/habla/internal/rundir"
 )
 
-// Interval is the time between two checks. ponytail: a var only so tests can shorten it.
-var Interval = 5 * time.Second
+// Retry is the pause after a failed poll. ponytail: a var only so tests can shorten it.
+var Retry = 5 * time.Second
+
+// Wait is the long poll's wait in seconds (the server caps it at 25). ponytail: a var only so tests can shorten it.
+var Wait = 25
 
 // Speak says one message; it waits until it has been played. ponytail: a var only so tests can record the messages.
 var Speak = func(ctx context.Context, text string) error {
@@ -73,7 +78,7 @@ func Main(args []string) int {
 		return 1
 	}
 	if desktop.Terminal(os.Stderr) {
-		fmt.Fprintf(os.Stderr, "Listening for #%s on %s (Ctrl+C to stop)\n", cfg.Inbox.Tag, cfg.Inbox.Server)
+		fmt.Fprintf(os.Stderr, "Listening for voice_say on %s (Ctrl+C to stop)\n", cfg.Inbox.Server)
 	}
 	if err := Run(ctx, cfg.Inbox, key); err != nil {
 		desktop.Notify("Inbox stopped: "+err.Error(), "", false)
@@ -82,94 +87,116 @@ func Main(args []string) int {
 	return 0
 }
 
-// Run checks the inbox every Interval until ctx ends. It returns an error only when the server refuses the key.
+// Run listens until ctx ends. It returns an error only when the server refuses the key.
 func Run(ctx context.Context, in *config.Inbox, key string) error {
-	c := &client{in: in, key: key, http: &http.Client{Timeout: 15 * time.Second}}
-	spoken := map[string]bool{} // messages already handled, in case the server refuses to delete one
-	for {
-		if err := c.check(ctx, spoken); err != nil {
-			if errors.Is(err, errRefused) {
-				return err
-			}
-			slog.Warn("inbox check failed", "err", err)
+	c := &client{in: in, key: key, http: &http.Client{Timeout: time.Duration(Wait+10) * time.Second}}
+	defer c.disconnect()
+	for ctx.Err() == nil {
+		err := c.poll(ctx)
+		switch {
+		case err == nil:
+			continue
+		case errors.Is(err, errRefused):
+			return err
+		case errors.Is(err, errUnknownAgent):
+			c.agent = "" // reaped or reassigned: register again
+			continue
+		case ctx.Err() != nil:
+			return nil
 		}
+		slog.Warn("inbox poll failed", "err", err)
 		select {
 		case <-ctx.Done():
-			return nil
-		case <-time.After(Interval):
-		}
-	}
-}
-
-type message struct {
-	ID               string    `json:"id"`
-	Name             string    `json:"name"`
-	CreatedAt        time.Time `json:"createdAt"`
-	CurrentVersionID string    `json:"currentVersionId"`
-}
-
-var errRefused = errors.New("the Artifact Server refused the inbox api_key")
-
-type client struct {
-	in   *config.Inbox
-	key  string
-	http *http.Client
-}
-
-// check speaks each fresh message, oldest first, and deletes every message it sees.
-func (c *client) check(ctx context.Context, spoken map[string]bool) error {
-	msgs, err := c.list(ctx)
-	if err != nil {
-		return err
-	}
-	slices.SortFunc(msgs, func(a, b message) int { return a.CreatedAt.Compare(b.CreatedAt) })
-	for _, m := range msgs {
-		if spoken[m.ID] {
-			continue
-		}
-		if rundir.RunningPID(rundir.Say) != 0 { // someone else is speaking: try again at the next check
-			return nil
-		}
-		spoken[m.ID] = true
-		if err := c.delete(ctx, m); err != nil {
-			slog.Warn("inbox delete failed", "id", m.ID, "err", err)
-		}
-		age := time.Since(m.CreatedAt)
-		if age > time.Duration(c.in.MaxAge)*time.Second {
-			slog.Info("inbox message expired", "id", m.ID, "age_s", int(age.Seconds()))
-			continue
-		}
-		slog.Info("inbox message", "id", m.ID, "chars", len(m.Name))
-		if err := Speak(ctx, strings.TrimSpace(m.Name)); err != nil && ctx.Err() == nil {
-			slog.Warn("inbox speak failed", "id", m.ID, "err", err)
+		case <-time.After(Retry):
 		}
 	}
 	return nil
 }
 
-func (c *client) list(ctx context.Context) ([]message, error) {
-	u := c.in.Server + "/api/v1/artifacts?limit=100&tag=" + url.QueryEscape(c.in.Tag)
-	var page struct {
-		Artifacts []struct {
-			Artifact message `json:"artifact"`
-		} `json:"artifacts"`
-	}
-	if err := c.do(ctx, http.MethodGet, u, "", nil, &page); err != nil {
-		return nil, err
-	}
-	msgs := make([]message, len(page.Artifacts))
-	for i, a := range page.Artifacts {
-		msgs[i] = a.Artifact
-	}
-	return msgs, nil
+var (
+	errRefused      = errors.New("the Artifact Server refused the inbox api_key")
+	errUnknownAgent = errors.New("the Artifact Server no longer knows this listener")
+)
+
+type client struct {
+	in    *config.Inbox
+	key   string
+	http  *http.Client
+	agent string // registered agent id; "" until registered
 }
 
-func (c *client) delete(ctx context.Context, m message) error {
-	body, _ := json.Marshal(map[string]string{"expectedCurrentVersionId": m.CurrentVersionID})
-	return c.do(ctx, http.MethodDelete, c.in.Server+"/api/v1/artifacts/"+url.PathEscape(m.ID), "habla-inbox-delete-"+m.ID, body, nil)
+// poll registers when needed, then waits for messages and speaks them in order.
+func (c *client) poll(ctx context.Context) error {
+	if c.agent == "" {
+		if err := c.register(ctx); err != nil {
+			return err
+		}
+	}
+	var got struct {
+		Messages []struct {
+			Text string `json:"text"`
+		} `json:"messages"`
+	}
+	u := fmt.Sprintf("%s/api/v1/agents/%s/voice?wait=%d", c.in.Server, url.PathEscape(c.agent), Wait)
+	if err := c.do(ctx, http.MethodPost, u, nil, &got); err != nil {
+		return err
+	}
+	for _, m := range got.Messages {
+		waitForSilence(ctx)
+		slog.Info("inbox message", "chars", len(m.Text))
+		if err := Speak(ctx, strings.TrimSpace(m.Text)); err != nil && ctx.Err() == nil {
+			slog.Warn("inbox speak failed", "err", err)
+		}
+	}
+	return nil
 }
 
-func (c *client) do(ctx context.Context, method, u, idempotency string, body []byte, into any) error {
+func (c *client) register(ctx context.Context) error {
+	host, _ := os.Hostname()
+	home, _ := os.UserHomeDir()
+	sum := sha256.Sum256([]byte(host + "\x00habla-inbox"))
+	body, _ := json.Marshal(map[string]any{
+		"connectionKey":    hex.EncodeToString(sum[:]),
+		"displayName":      "habla on " + host,
+		"kind":             "habla",
+		"workingDirectory": home,
+	})
+	var got struct {
+		Agent struct {
+			ID string `json:"id"`
+		} `json:"agent"`
+	}
+	if err := c.do(ctx, http.MethodPost, c.in.Server+"/api/v1/agents", body, &got); err != nil {
+		return err
+	}
+	if got.Agent.ID == "" {
+		return errors.New("the Artifact Server registered no agent")
+	}
+	c.agent = got.Agent.ID
+	return nil
+}
+
+// disconnect tells the server this listener is gone, so voice_say stops queueing at once (best effort).
+func (c *client) disconnect() {
+	if c.agent == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	c.do(ctx, http.MethodPost, c.in.Server+"/api/v1/agents/"+url.PathEscape(c.agent)+"/disconnect", nil, nil)
+}
+
+// waitForSilence waits up to 30 s while another habla say plays, so messages never cut each other.
+func waitForSilence(ctx context.Context) {
+	for i := 0; i < 60 && rundir.RunningPID(rundir.Say) != 0 && ctx.Err() == nil; i++ {
+		select {
+		case <-ctx.Done():
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+}
+
+func (c *client) do(ctx context.Context, method, u string, body []byte, into any) error {
 	req, err := http.NewRequestWithContext(ctx, method, u, strings.NewReader(string(body)))
 	if err != nil {
 		return err
@@ -177,9 +204,6 @@ func (c *client) do(ctx context.Context, method, u, idempotency string, body []b
 	req.Header.Set("Authorization", "Bearer "+c.key)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
-	}
-	if idempotency != "" {
-		req.Header.Set("Idempotency-Key", idempotency)
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
@@ -189,6 +213,10 @@ func (c *client) do(ctx context.Context, method, u, idempotency string, body []b
 	switch {
 	case resp.StatusCode == http.StatusUnauthorized:
 		return errRefused
+	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusForbidden:
+		return errUnknownAgent
+	case resp.StatusCode == http.StatusNoContent:
+		return nil
 	case resp.StatusCode/100 != 2:
 		return fmt.Errorf("%s %s: HTTP %d", method, req.URL.Path, resp.StatusCode)
 	case into != nil:

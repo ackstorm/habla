@@ -5,6 +5,13 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Changed
+
+- `habla inbox` listens for `voice_say` on the Artifact Server instead of polling artifacts tagged `voz`: it registers
+  as an agent of kind `habla` and long-polls its voice route, so agents queue nothing while you are not listening.
+  Its API key needs *Connect agents* (`agent:connect`) instead of *Read artifacts*. `[inbox]` loses `tag` and
+  `max_age` (the server drops messages after 60 s); remove them from `config.toml`.
+
 ## [0.1.17] - 2026-11-05
 
 ### Fixed

@@ -88,11 +88,10 @@ snippets and notes: [references/speak.md](references/speak.md).
 ## Speak from another machine: the inbox
 
 When the user listens with `habla inbox` (or the tray's *Speak inbox messages*), any agent with the Artifact Server
-MCP can speak to them from any machine, without `habla` installed: publish one tiny file (any content) as a new
-artifact tagged `voz`, with the spoken text as its **name**. The user's habla speaks it within ~5 s and deletes it.
+MCP can speak to them from any machine, without `habla` installed: call `voice_say(text)`. It answers
+`queued: true` when the user's habla is listening, and `queued: false` (nothing stored) when not: carry on silently,
+never retry. The artifact skill's `references/voice.md` has the details.
 
-- Name: one or two short plain sentences in the user's language, starting with who speaks ("VM: task X finished").
-  Never code, paths, logs or secrets: the name is stored on the server and read aloud.
-- `accessSetting: "private"`, tag exactly `voz`, a new artifact per message (never a new version).
-- A message nobody hears within 60 s is deleted unspoken: the user is not listening. Do not resend it.
-- Same rules as `habla say`: only when the user asked, directly or in their CLAUDE.md/AGENTS.md.
+- One or two short plain sentences in the user's language, starting with where you run ("VM: task X finished"). Never
+  code, paths, logs or secrets.
+- When to speak is the user's call, in their own CLAUDE.md/AGENTS.md or the conversation; without it, don't.
