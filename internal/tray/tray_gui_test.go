@@ -28,7 +28,8 @@ var (
 	dbusSession, _ = exec.LookPath("dbus-run-session")
 	dbusDaemon, _  = exec.LookPath("dbus-daemon")
 	xdotool, _     = exec.LookPath("xdotool")
-	built          string // the real habla binary, built by run under HABLA_GUI=1
+	bwrap, _       = exec.LookPath("bwrap") // GTK's glycin image loader runs it by name to decode the SVG icons
+	built          string                   // the real habla binary, built by run under HABLA_GUI=1
 )
 
 // run builds habla (CGO_ENABLED=0, as released) for the GUI tests, then runs the tests.
@@ -71,6 +72,11 @@ func guiEnv(t *testing.T, extraConfig string) (*testenv.Env, *testenv.Gateway) {
 	e.Remove("habla")
 	if err := os.Symlink(built, filepath.Join(e.Bin, "habla")); err != nil {
 		t.Fatal(err)
+	}
+	if bwrap != "" {
+		if err := os.Symlink(bwrap, filepath.Join(e.Bin, "bwrap")); err != nil {
+			t.Fatal(err)
+		}
 	}
 	g := testenv.NewGateway(t, testenv.DefaultReplies)
 	e.WriteConfig(t, g, extraConfig)
