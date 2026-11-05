@@ -29,7 +29,6 @@ jobs:
 
   gui:
     runs-on: ubuntu-latest
-    continue-on-error: true # optional until the tray is proven on a runner
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
