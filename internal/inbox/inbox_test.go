@@ -114,6 +114,16 @@ func TestRunRegistersSpeaksAndDisconnects(t *testing.T) {
 	}
 }
 
+func TestRunStopsWhenTheKeyCannotRegister(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusForbidden) }))
+	defer srv.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := Run(ctx, &config.Inbox{Server: srv.URL}, "k"); err != errNoCapability {
+		t.Fatalf("got %v, want errNoCapability", err)
+	}
+}
+
 func TestRunStopsWhenTheKeyIsRefused(t *testing.T) {
 	srv := httptest.NewServer(&fakeServer{})
 	defer srv.Close()

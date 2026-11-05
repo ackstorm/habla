@@ -96,7 +96,7 @@ func Run(ctx context.Context, in *config.Inbox, key string) error {
 		switch {
 		case err == nil:
 			continue
-		case errors.Is(err, errRefused):
+		case errors.Is(err, errRefused), errors.Is(err, errNoCapability):
 			return err
 		case errors.Is(err, errUnknownAgent):
 			c.agent = "" // reaped or reassigned: register again
@@ -115,6 +115,7 @@ func Run(ctx context.Context, in *config.Inbox, key string) error {
 
 var (
 	errRefused      = errors.New("the Artifact Server refused the inbox api_key")
+	errNoCapability = errors.New("the inbox api_key lacks agent:connect (Connect agents)")
 	errUnknownAgent = errors.New("the Artifact Server no longer knows this listener")
 )
 
@@ -167,6 +168,9 @@ func (c *client) register(ctx context.Context) error {
 		} `json:"agent"`
 	}
 	if err := c.do(ctx, http.MethodPost, c.in.Server+"/api/v1/agents", body, &got); err != nil {
+		if errors.Is(err, errUnknownAgent) { // 403 here: the key may not register agents
+			return errNoCapability
+		}
 		return err
 	}
 	if got.Agent.ID == "" {

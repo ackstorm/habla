@@ -5,6 +5,11 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Fixed
+
+- `habla inbox` with an API key that lacks *Connect agents* stops with a notification naming the missing capability
+  instead of retrying the registration in a tight loop.
+
 ## [0.1.18] - 2026-11-06
 
 ### Changed
