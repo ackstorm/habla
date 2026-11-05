@@ -191,7 +191,7 @@ warning. Merely defining an unselected style does not produce a warning in the c
 | `tts` provider `instructions_mode` | Protocol | Delivery |
 | --- | --- | --- |
 | absent or `""` | Either | Base voice, plain text; styles disabled. |
-| `inline` | Either | Instructions and text wrapped in `<systemInstructions>` and `<text>` inside the input text. |
+| `inline` | Either | `<instructions>…</instructions>` before the text, inside the input text. |
 | `instructions` | OpenAI only | Separate speech request `instructions` field. |
 | `system_instruction` | Gemini only | Native `systemInstruction` field. |
 

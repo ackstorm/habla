@@ -210,7 +210,7 @@ func TestSelectedStyleUsesOneSpeechRequest(t *testing.T) {
 		t.Fatal(paths)
 	}
 	s := body(t, g, 0)
-	if s["voice"] != "Puck" || !strings.HasPrefix(s["input"].(string), "<systemInstructions>") {
+	if s["voice"] != "Puck" || !strings.HasPrefix(s["input"].(string), "<instructions>") {
 		t.Fatal(s)
 	}
 }

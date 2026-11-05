@@ -5,6 +5,12 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Fixed
+
+- `habla say` with `instructions_mode = "inline"` no longer reads the style aloud on Gemini TTS: the style goes in an
+  `<instructions>` tag before the text instead of a `<systemInstructions>`/`<text>` wrapper, which the model read aloud
+  most of the time.
+
 ## [0.1.16] - 2026-11-05
 
 ### Added
