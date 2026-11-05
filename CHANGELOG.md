@@ -5,6 +5,8 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+## [0.1.16] - 2026-11-05
+
 ### Added
 
 - `habla inbox` speaks the messages agents leave on an Artifact Server: artifacts tagged `voz` whose name is the text,
@@ -172,7 +174,8 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 - `habla` skill for Claude Code and Codex: configuration and spoken replies via `habla say`.
 - One static binary (amd64, arm64) installed by `install.sh` with checksum verification and tray autostart.
 
-[Unreleased]: https://github.com/ackstorm/habla/compare/v0.1.15...HEAD
+[Unreleased]: https://github.com/ackstorm/habla/compare/v0.1.16...HEAD
+[0.1.16]: https://github.com/ackstorm/habla/compare/v0.1.15...v0.1.16
 [0.1.15]: https://github.com/ackstorm/habla/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/ackstorm/habla/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/ackstorm/habla/compare/v0.1.12...v0.1.13
