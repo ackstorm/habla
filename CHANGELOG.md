@@ -5,6 +5,8 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+## [0.1.17] - 2026-11-05
+
 ### Fixed
 
 - `habla say` with `instructions_mode = "inline"` no longer reads the style aloud on Gemini TTS: the style goes in an
@@ -180,7 +182,8 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 - `habla` skill for Claude Code and Codex: configuration and spoken replies via `habla say`.
 - One static binary (amd64, arm64) installed by `install.sh` with checksum verification and tray autostart.
 
-[Unreleased]: https://github.com/ackstorm/habla/compare/v0.1.16...HEAD
+[Unreleased]: https://github.com/ackstorm/habla/compare/v0.1.17...HEAD
+[0.1.17]: https://github.com/ackstorm/habla/compare/v0.1.16...v0.1.17
 [0.1.16]: https://github.com/ackstorm/habla/compare/v0.1.15...v0.1.16
 [0.1.15]: https://github.com/ackstorm/habla/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/ackstorm/habla/compare/v0.1.13...v0.1.14
