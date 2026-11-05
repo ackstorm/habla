@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ackstorm/habla/internal/inbox"
 	"github.com/ackstorm/habla/internal/listen"
 	"github.com/ackstorm/habla/internal/live"
 	"github.com/ackstorm/habla/internal/say"
@@ -17,6 +18,7 @@ var version = "dev"
 
 const usage = "usage: habla listen [--paste] [--provider NAME] [--start | --stop | --toggle | --cancel | --retry | --status]\n" +
 	"       habla say [--out FILE | --stop] [--provider NAME] [TEXT]\n" +
+	"       habla inbox\n" +
 	"       habla stats [--by day|week|month] [--json]\n" +
 	"       habla live [--context FILE] [--no-output | --output-file FILE] [--provider NAME]\n" +
 	"       habla tray [--install-autostart]\n" +
@@ -35,6 +37,8 @@ func main() {
 			os.Exit(listen.Main(os.Args[2:]))
 		case "say":
 			os.Exit(say.Main(os.Args[2:]))
+		case "inbox":
+			os.Exit(inbox.Main(os.Args[2:]))
 		case "stats":
 			os.Exit(stats.Main(os.Args[2:]))
 		case "live":

@@ -218,6 +218,7 @@ type Config struct {
 	Styles         map[string]Style     // [styles.*]
 	Split          Split
 	Prices         map[string]Price
+	Inbox          *Inbox               // habla inbox (nil: no [inbox])
 	Providers      map[string]Providers // per configured service ("stt", "llm", "tts", "live")
 	file           *file                // every provider, for Use
 }
@@ -239,6 +240,7 @@ type file struct {
 	Styles  map[string]Style   `toml:"styles"`
 	Split   Split              `toml:"split"`
 	Prices  map[string]Price   `toml:"prices"`
+	Inbox   *Inbox             `toml:"inbox"`
 }
 
 type serviceFile[T any] struct {
@@ -299,6 +301,15 @@ type STT struct {
 type Transform struct {
 	Model  string `toml:"model"`
 	Prompt string `toml:"prompt"`
+}
+
+// Inbox is where habla inbox reads its messages: artifacts tagged Tag on an Artifact Server.
+type Inbox struct {
+	Enabled bool   `toml:"enabled"` // habla tray runs habla inbox while true (its menu's Inbox check)
+	Server  string `toml:"server"`  // the Artifact Server origin, https://
+	APIKey  string `toml:"api_key"` // env:VARIABLE or cmd:COMMAND; an API key with artifact:read
+	Tag     string `toml:"tag"`     // "voz" when unset
+	MaxAge  int    `toml:"max_age"` // seconds; older messages are dropped unspoken; 60 when unset
 }
 
 type Split struct {
@@ -443,7 +454,7 @@ func decode(text string, f *file) (*Config, error) {
 			order[table] = append(order[table], k[len(k)-1])
 		}
 	}
-	c := &Config{General: f.General, Tray: f.Tray, Styles: f.Styles, Split: f.Split, Prices: f.Prices, Providers: map[string]Providers{}, file: f}
+	c := &Config{General: f.General, Tray: f.Tray, Styles: f.Styles, Split: f.Split, Prices: f.Prices, Inbox: f.Inbox, Providers: map[string]Providers{}, file: f}
 	for _, name := range order["styles"] {
 		if strings.TrimSpace(f.Styles[name].Instructions) == "" {
 			return nil, fmt.Errorf("styles.%s.instructions: required", name)
@@ -563,6 +574,22 @@ func decode(text string, f *file) (*Config, error) {
 	}
 	if c.UploadIntervalMS < 50 || c.UploadIntervalMS > 1000 {
 		return nil, invalid(text, "general", "upload_interval_ms", "an integer from 50 to 1000 milliseconds")
+	}
+	if in := c.Inbox; in != nil {
+		u, err := url.Parse(in.Server)
+		if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" {
+			return nil, invalid(text, "inbox", "server", "an https:// origin, e.g. https://artifacts.example.com")
+		}
+		in.Server = strings.TrimSuffix(in.Server, "/")
+		if source, rest, _ := strings.Cut(in.APIKey, ":"); (source != "env" && source != "cmd") || strings.TrimSpace(rest) == "" {
+			return nil, invalid(text, "inbox", "api_key", "env:VARIABLE or cmd:COMMAND")
+		}
+		in.Tag = cmp.Or(in.Tag, "voz")
+		if !md.IsDefined("inbox", "max_age") {
+			in.MaxAge = 60
+		} else if in.MaxAge <= 0 {
+			return nil, invalid(text, "inbox", "max_age", "a positive number of seconds")
+		}
 	}
 	seconds := func(v float64) bool { return v > 0 && !math.IsInf(v, 0) } // also false for NaN
 	if c.Split.Enabled && !seconds(c.Split.After) {
@@ -818,6 +845,7 @@ var choices = map[string][2]string{
 	"live_provider": {"live", ""},
 	"paste":         {"tray", "paste"},
 	"paste_enter":   {"tray", "paste_enter"},
+	"inbox":         {"inbox", "enabled"},
 }
 
 // SaveChoice writes one tray-menu choice (a string or bool) into config.toml, atomically, keeping every other line
@@ -852,7 +880,7 @@ func SaveChoice(choice string, value any) error {
 	switch {
 	case key == "":
 		key = "provider"
-	case section != "tray":
+	case section != "tray" && section != "inbox":
 		p, ok := current.Providers[section]
 		if !ok {
 			return fmt.Errorf("%s: no [%s]", path, section)

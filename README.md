@@ -10,6 +10,7 @@ supports.
 - `habla tray`: hold-to-talk dictation to the clipboard, or pasted into the focused window
 - `habla listen`: speech to text from a terminal or your own key bindings, with optional LLM transforms
 - `habla say`: text to speech, with optional styles
+- `habla inbox`: speak the messages agents leave on an Artifact Server
 - `habla live` (experimental): realtime spoken conversation
 - `habla stats`: cost and latency per service
 
@@ -63,6 +64,7 @@ The installer warns about what is missing (Debian/Ubuntu package names):
     habla listen --transform english  # ...with another [stt.transforms.*] for this run ("": none)
     habla tray                # tray icon + hold-to-talk hotkey (Super+Space)
     habla say "Hello"         # speak
+    habla inbox               # speak the messages agents leave on an Artifact Server
     habla live --context notes.txt  # experimental spoken conversation about a text file
     habla stats               # cost and latency
     habla --version
@@ -272,6 +274,30 @@ select a shared `[styles.<name>]` with `style = "name"` in the provider and set 
 `instructions` or `system_instruction`; the instructions travel in the single speech request (there is no text rewrite
 request). Use `inline` for models that ignore the separate `instructions` field. Without `instructions_mode` a selected
 style is not applied and `habla say` warns once. An unset style speaks the original text.
+
+## Inbox
+
+Agents on any machine can talk to you without reaching your laptop: they publish a message on an
+[Artifact Server](https://artifacts.ackstorm.ai), and `habla inbox` speaks it.
+
+```toml
+[inbox]
+server  = "https://artifacts.example.com"   # the Artifact Server origin
+api_key = "cmd:pass show habla-inbox"      # env:VARIABLE or cmd:COMMAND
+# tag = "voz"                              # the tag that marks a message
+# max_age = 60                             # seconds; older messages are dropped unspoken
+# enabled = true                           # habla tray runs habla inbox (its menu's check)
+```
+
+A message is an artifact tagged `voz` whose **name** is the text. Every 5 s `habla inbox` lists them, speaks each one
+younger than `max_age` (oldest first, with the active TTS provider) and deletes every message it sees. Messages sent
+while nobody listens expire: turning the inbox on later does not replay them. While another `habla say` plays, a
+message waits for the next check.
+
+The API key is issued by an Artifact Server administrator (Settings → API keys), bound to the member whose agents
+publish the messages, with the *Read artifacts* capability alone: it lists that member's artifacts and deletes them.
+
+In `habla tray`, *Speak inbox messages* (shown when `[inbox]` exists) starts and stops it and saves `enabled`.
 
 ## Live (experimental)
 

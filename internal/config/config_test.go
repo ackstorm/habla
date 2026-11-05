@@ -646,3 +646,38 @@ func TestDefaultsIncludeInactiveElevenLabs(t *testing.T) {
 		t.Fatalf("%+v", c.Providers["tts"])
 	}
 }
+
+func TestInboxConfiguration(t *testing.T) {
+	const valid = "[inbox]\nserver = \"https://artifacts.example.com/\"\napi_key = \"cmd:pass show inbox\"\n"
+	for _, tc := range []struct{ text, problem string }{
+		{valid, ""},
+		{strings.ReplaceAll(valid, "https://", "http://"), "inbox.server"},
+		{strings.ReplaceAll(valid, ".com/", ".com/api"), "inbox.server"},
+		{strings.ReplaceAll(valid, "cmd:pass show inbox", "as_key_literal"), "inbox.api_key"},
+		{valid + "max_age = 0\n", "inbox.max_age"},
+	} {
+		t.Run(tc.problem+tc.text[:8], func(t *testing.T) {
+			setup(t)
+			write(t, Path(), tc.text)
+			c, err := Load()
+			if tc.problem != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.problem) || strings.Contains(err.Error(), "as_key_literal") {
+					t.Fatalf("unexpected validation error: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if in := c.Inbox; in == nil || in.Enabled || in.Server != "https://artifacts.example.com" || in.Tag != "voz" || in.MaxAge != 60 {
+				t.Fatalf("inbox = %+v", c.Inbox)
+			}
+			if err := SaveChoice("inbox", true); err != nil {
+				t.Fatal(err)
+			}
+			if c, err := Load(); err != nil || !c.Inbox.Enabled || c.Inbox.APIKey != "cmd:pass show inbox" {
+				t.Fatalf("after the tray check: %+v, %v", c.Inbox, err)
+			}
+		})
+	}
+}

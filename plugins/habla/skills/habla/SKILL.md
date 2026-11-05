@@ -1,11 +1,12 @@
 ---
 name: habla
-description: Configure Habla (config.toml, providers, models, voices, transforms, styles, troubleshooting) and speak to the user out loud with `habla say`, including opt-in spoken notifications ("tell me out loud when you finish", "set up spoken notifications"). Not for Claude or Codex settings unrelated to speech, nor Habla development.
+description: Configure Habla (config.toml, providers, models, voices, transforms, styles, troubleshooting) and speak to the user out loud with `habla say`, including opt-in spoken notifications ("tell me out loud when you finish", "set up spoken notifications"), and from another machine through the habla inbox (an artifact tagged voz on the Artifact Server). Not for Claude or Codex settings unrelated to speech, nor Habla development.
 ---
 
 # Habla
 
-Two parts: configure Habla, and speak to the user through `habla say`.
+Three parts: configure Habla, speak to the user through `habla say`, and speak from another machine through the
+inbox.
 
 ## Configure
 
@@ -83,3 +84,15 @@ snippets and notes: [references/speak.md](references/speak.md).
 - Instruction line in CLAUDE.md/AGENTS.md: "When you finish a task or need my input, say a one-sentence summary out loud with `habla say`."
 - Claude Code hooks (`Stop`, `Notification`) in `~/.claude/settings.json` or `.claude/settings.json`.
 - Codex `notify` in `~/.codex/config.toml`.
+
+## Speak from another machine: the inbox
+
+When the user listens with `habla inbox` (or the tray's *Speak inbox messages*), any agent with the Artifact Server
+MCP can speak to them from any machine, without `habla` installed: publish one tiny file (any content) as a new
+artifact tagged `voz`, with the spoken text as its **name**. The user's habla speaks it within ~5 s and deletes it.
+
+- Name: one or two short plain sentences in the user's language, starting with who speaks ("VM: task X finished").
+  Never code, paths, logs or secrets: the name is stored on the server and read aloud.
+- `accessSetting: "private"`, tag exactly `voz`, a new artifact per message (never a new version).
+- A message nobody hears within 60 s is deleted unspoken: the user is not listening. Do not resend it.
+- Same rules as `habla say`: only when the user asked, directly or in their CLAUDE.md/AGENTS.md.

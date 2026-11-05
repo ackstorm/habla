@@ -5,6 +5,12 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Added
+
+- `habla inbox` speaks the messages agents leave on an Artifact Server: artifacts tagged `voz` whose name is the text,
+  spoken when younger than `max_age` (60 s) and deleted once seen. Configure it in a new `[inbox]` section; the
+  tray's *Speak inbox messages* check runs it.
+
 ## [0.1.15] - 2026-11-02
 
 ### Fixed

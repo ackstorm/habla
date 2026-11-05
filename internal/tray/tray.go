@@ -102,6 +102,7 @@ func Main(args []string) int {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	go func() { <-quit; gtk.Idle(gtk.MainQuit) }()
 	gtk.Main()
+	t.runInbox(false)
 	if t.hotkey != nil {
 		t.hotkey.close() // a recording in progress is a detached process and keeps going
 	}
@@ -178,6 +179,7 @@ type shown struct {
 	recording, failed bool
 	choices           map[string][]Choice
 	paste, pasteEnter bool
+	inbox             *bool // nil: no [inbox], no menu item
 }
 
 type tray struct {
@@ -196,6 +198,7 @@ type tray struct {
 	pillPhase       string // the phase and hint the pill shows
 	pillHint        []Segment
 	pending         atomic.Bool // a refresh is queued on the GTK thread
+	inbox           *exec.Cmd   // the habla inbox the tray runs while [inbox] enabled; nil when none
 }
 
 func newTray(cfg *config.Config) (*tray, error) {
@@ -364,7 +367,11 @@ func (t *tray) refresh() {
 		t.cfg = cfg
 	}
 	_, err := os.Stat(filepath.Join(rundir.Dir(), "failed.wav"))
-	now := &shown{state == "recording", err == nil, MenuChoices(t.cfg), t.cfg.Tray.Paste, t.cfg.Tray.PasteEnter}
+	now := &shown{state == "recording", err == nil, MenuChoices(t.cfg), t.cfg.Tray.Paste, t.cfg.Tray.PasteEnter, nil}
+	if in := t.cfg.Inbox; in != nil {
+		now.inbox = &in.Enabled
+	}
+	t.runInbox(now.inbox != nil && *now.inbox)
 	if !reflect.DeepEqual(now, t.shown) {
 		t.shown = now
 		// Ayatana checks the middle-click target against the menu it holds, in set_menu too: a target in the other
@@ -434,6 +441,12 @@ func (t *tray) buildMenu(s *shown) (menu, toggle uintptr) {
 	gtk.WidgetSetSensitive(enter, s.paste) // Enter follows the paste
 	gtk.Connect(enter, "toggled", func() { t.choose("paste_enter", gtk.CheckMenuItemGetActive(enter)) })
 	gtk.MenuShellAppend(menu, enter)
+	if s.inbox != nil {
+		inbox := gtk.CheckMenuItemNewWithLabel("Speak inbox messages")
+		gtk.CheckMenuItemSetActive(inbox, *s.inbox)
+		gtk.Connect(inbox, "toggled", func() { t.choose("inbox", gtk.CheckMenuItemGetActive(inbox)) })
+		gtk.MenuShellAppend(menu, inbox)
+	}
 	gtk.MenuShellAppend(menu, gtk.SeparatorMenuItemNew())
 	edit := gtk.MenuItemNewWithLabel("Edit config…")
 	gtk.Connect(edit, "activate", func() { start(exec.Command("xdg-open", config.Path())) })
@@ -526,6 +539,26 @@ func start(cmd *exec.Cmd) {
 		return
 	}
 	go cmd.Wait()
+}
+
+// runInbox starts `habla inbox` when on and none runs, and stops the running one when off. An inbox that exits by
+// itself (a refused key, an invalid config) is not restarted until the check is turned off and on again.
+func (t *tray) runInbox(on bool) {
+	switch {
+	case on && t.inbox == nil:
+		self, err := os.Executable()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "habla tray:", err)
+			return
+		}
+		t.inbox = exec.Command(self, "inbox")
+		start(t.inbox)
+	case !on && t.inbox != nil:
+		if t.inbox.Process != nil {
+			t.inbox.Process.Signal(syscall.SIGTERM)
+		}
+		t.inbox = nil
+	}
 }
 
 // notify shows a notification without blocking the GTK thread on D-Bus.
