@@ -106,6 +106,12 @@ func Main(args []string) int {
 	if t.hotkey != nil {
 		t.hotkey.close() // a recording in progress is a detached process and keeps going
 	}
+	if t.reload {
+		lock.Close()
+		err := syscall.Exec(HablaPath(), os.Args, os.Environ()) // the same pid, the installed binary, every setting read anew
+		fmt.Fprintln(os.Stderr, "habla tray: reload:", err)
+		return 1
+	}
 	return 0
 }
 
@@ -199,6 +205,7 @@ type tray struct {
 	pillHint        []Segment
 	pending         atomic.Bool // a refresh is queued on the GTK thread
 	inbox           *exec.Cmd   // the habla inbox the tray runs while [inbox] enabled; nil when none
+	reload          bool        // Reload chosen: exec the tray again once the main loop ends
 }
 
 func newTray(cfg *config.Config) (*tray, error) {
@@ -418,7 +425,7 @@ func (t *tray) buildMenu(s *shown) (menu, toggle uintptr) {
 	}
 	gtk.MenuShellAppend(menu, gtk.SeparatorMenuItemNew())
 	for _, group := range [][]struct{ key, title string }{ // quick choices, then the active providers
-		{{"transform", "Transform"}},
+		{{"transform", "Transform"}, {"voice_style", "Voice style"}},
 		{{"stt_provider", "STT provider"}, {"llm_provider", "LLM provider"}},
 	} {
 		appended := false
@@ -451,6 +458,12 @@ func (t *tray) buildMenu(s *shown) (menu, toggle uintptr) {
 	edit := gtk.MenuItemNewWithLabel("Edit config…")
 	gtk.Connect(edit, "activate", func() { start(exec.Command("xdg-open", config.Path())) })
 	gtk.MenuShellAppend(menu, edit)
+	reload := gtk.MenuItemNewWithLabel("Reload")
+	gtk.Connect(reload, "activate", func() { t.reload = true; gtk.MainQuit() })
+	gtk.MenuShellAppend(menu, reload)
+	logFile := gtk.MenuItemNewWithLabel("View logs…")
+	gtk.Connect(logFile, "activate", func() { start(exec.Command("xdg-open", logs.Path())) })
+	gtk.MenuShellAppend(menu, logFile)
 	quit := gtk.MenuItemNewWithLabel("Quit") // a recording in progress is a detached process and keeps going
 	gtk.Connect(quit, "activate", gtk.MainQuit)
 	gtk.MenuShellAppend(menu, quit)

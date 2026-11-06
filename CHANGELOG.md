@@ -5,6 +5,15 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+## [0.1.20] - 2026-11-06
+
+### Added
+
+- Tray *Voice style* menu, next to *Transform*: pick one of your `[styles.*]` for `habla say`, `habla live` and the
+  inbox. It writes `style` into `[tts]` and `[live]`, a new key that overrides the active provider's style, and
+  removes it where the pick matches the provider's own.
+- Tray *Reload* (restarts the tray in place: hotkey, inbox key, a new binary) and *View logs…* (opens `habla.log`).
+
 ## [0.1.19] - 2026-11-06
 
 ### Fixed
@@ -198,7 +207,8 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 - `habla` skill for Claude Code and Codex: configuration and spoken replies via `habla say`.
 - One static binary (amd64, arm64) installed by `install.sh` with checksum verification and tray autostart.
 
-[Unreleased]: https://github.com/ackstorm/habla/compare/v0.1.19...HEAD
+[Unreleased]: https://github.com/ackstorm/habla/compare/v0.1.20...HEAD
+[0.1.20]: https://github.com/ackstorm/habla/compare/v0.1.19...v0.1.20
 [0.1.19]: https://github.com/ackstorm/habla/compare/v0.1.18...v0.1.19
 [0.1.18]: https://github.com/ackstorm/habla/compare/v0.1.17...v0.1.18
 [0.1.17]: https://github.com/ackstorm/habla/compare/v0.1.16...v0.1.17

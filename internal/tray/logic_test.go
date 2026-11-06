@@ -531,3 +531,16 @@ func TestEnqueueListenPutsPasteFlagsBeforeTheMode(t *testing.T) {
 		t.Fatalf("%q, want %q", queue[0], want)
 	}
 }
+
+func TestMenuChoicesListVoiceStylesWhenTTSAppliesThem(t *testing.T) {
+	c := config.Defaults()
+	if got := MenuChoices(c)["voice_style"]; got != nil {
+		t.Fatalf("styles listed without instructions_mode: %v", got)
+	}
+	c.TTS.InstructionsMode, c.TTS.Style = "inline", "sevilla"
+	want := []Choice{{"None: plain voice", "", false}, {"Default", "default", false}, {"Storyteller", "storyteller", false},
+		{"Sevilla", "sevilla", true}, {"English", "english", false}}
+	if got := MenuChoices(c)["voice_style"]; !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v\nwant %v", got, want)
+	}
+}

@@ -105,6 +105,7 @@ prompt = "Rewrite as a one-line Angular commit message: type(scope): subject."
 
 [tts]
 provider = "openai"
+# style = "sevilla"                  # overrides the active provider's style; the tray's Voice style menu sets it
 
 [tts.providers.openai]
 api                = "openai"
@@ -216,6 +217,7 @@ type Config struct {
 	Transform      map[string]Transform // [stt.transforms.*]
 	TransformOrder []string             // their names in file order
 	Styles         map[string]Style     // [styles.*]
+	StyleOrder     []string             // their names in file order
 	Split          Split
 	Prices         map[string]Price
 	Inbox          *Inbox               // habla inbox (nil: no [inbox])
@@ -235,8 +237,8 @@ type file struct {
 	Tray    Tray               `toml:"tray"`
 	STT     *sttFile           `toml:"stt"`
 	LLM     *serviceFile[Conn] `toml:"llm"`
-	TTS     *serviceFile[TTS]  `toml:"tts"`
-	Live    *serviceFile[Live] `toml:"live"`
+	TTS     *voiceFile[TTS]    `toml:"tts"`
+	Live    *voiceFile[Live]   `toml:"live"`
 	Styles  map[string]Style   `toml:"styles"`
 	Split   Split              `toml:"split"`
 	Prices  map[string]Price   `toml:"prices"`
@@ -245,6 +247,13 @@ type file struct {
 
 type serviceFile[T any] struct {
 	Provider  string       `toml:"provider"`
+	Providers map[string]T `toml:"providers"`
+}
+
+// voiceFile is [tts] or [live]: style, when set (even to ""), overrides the active provider's.
+type voiceFile[T any] struct {
+	Provider  string       `toml:"provider"`
+	Style     *string      `toml:"style"`
 	Providers map[string]T `toml:"providers"`
 }
 
@@ -453,6 +462,7 @@ func decode(text string, f *file) (*Config, error) {
 		}
 	}
 	c := &Config{General: f.General, Tray: f.Tray, Styles: f.Styles, Split: f.Split, Prices: f.Prices, Inbox: f.Inbox, Providers: map[string]Providers{}, file: f}
+	c.StyleOrder = order["styles"]
 	for _, name := range order["styles"] {
 		if strings.TrimSpace(f.Styles[name].Instructions) == "" {
 			return nil, fmt.Errorf("styles.%s.instructions: required", name)
@@ -492,6 +502,11 @@ func decode(text string, f *file) (*Config, error) {
 		}
 	}
 	if t := f.TTS; t != nil {
+		if t.Style != nil {
+			if err := style("tts", *t.Style); err != nil {
+				return nil, err
+			}
+		}
 		for _, name := range order["tts.providers"] {
 			p, section := t.Providers[name], "tts.providers."+name
 			if err := checkConn(text, md, section, &p.Conn); err != nil {
@@ -521,6 +536,11 @@ func decode(text string, f *file) (*Config, error) {
 		}
 	}
 	if l := f.Live; l != nil {
+		if l.Style != nil {
+			if err := style("live", *l.Style); err != nil {
+				return nil, err
+			}
+		}
 		for _, name := range order["live.providers"] {
 			p, section := l.Providers[name], "live.providers."+name
 			for key, value := range map[string]string{"endpoint": p.Endpoint, "model": p.Model, "api_key": p.APIKey} {
@@ -660,10 +680,16 @@ func (c *Config) resolve(service, name string) {
 		c.LLM = &p
 	case "tts":
 		p := c.file.TTS.Providers[name]
+		if s := c.file.TTS.Style; s != nil {
+			p.Style = *s
+		}
 		p.Instructions = strings.TrimSpace(c.Styles[p.Style].Instructions)
 		c.TTS = &p
 	case "live":
 		p := c.file.Live.Providers[name]
+		if s := c.file.Live.Style; s != nil {
+			p.Style = *s
+		}
 		p.Instructions = strings.TrimSpace(c.Styles[p.Style].Instructions)
 		c.Live = &p
 	}
@@ -864,22 +890,27 @@ func SaveChoice(choice string, value any) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", path, err)
 	}
-	place, ok := choices[choice]
-	if !ok {
-		return fmt.Errorf("unknown choice %q", choice)
-	}
-	section, key := place[0], place[1]
-	switch {
-	case key == "":
-		key = "provider"
-	case section != "tray" && section != "inbox":
-		p, ok := current.Providers[section]
+	text := string(data)
+	if choice == "voice_style" {
+		text = voiceStyle(text, current, value.(string))
+	} else {
+		place, ok := choices[choice]
 		if !ok {
-			return fmt.Errorf("%s: no [%s]", path, section)
+			return fmt.Errorf("unknown choice %q", choice)
 		}
-		section += ".providers." + p.Active
+		section, key := place[0], place[1]
+		switch {
+		case key == "":
+			key = "provider"
+		case section != "tray" && section != "inbox":
+			p, ok := current.Providers[section]
+			if !ok {
+				return fmt.Errorf("%s: no [%s]", path, section)
+			}
+			section += ".providers." + p.Active
+		}
+		text = setKey(text, section, key, literal)
 	}
-	text := setKey(string(data), section, key, literal)
 	if _, err := parse(text); err != nil {
 		return fmt.Errorf("%s: %w", path, err)
 	}
@@ -901,6 +932,51 @@ func SaveChoice(choice string, value any) error {
 		os.Remove(tmp.Name())
 	}
 	return err
+}
+
+// voiceStyle sets the tray's Voice style in [tts] and [live]: style = name where it differs from the active
+// provider's own style, and no style key where it matches, so the provider decides again.
+func voiceStyle(text string, c *Config, name string) string {
+	own := map[string]string{}
+	if c.file.TTS != nil {
+		own["tts"] = c.file.TTS.Providers[c.Providers["tts"].Active].Style
+	}
+	if c.file.Live != nil {
+		own["live"] = c.file.Live.Providers[c.Providers["live"].Active].Style
+	}
+	for _, service := range []string{"tts", "live"} {
+		mine, ok := own[service]
+		switch {
+		case !ok:
+		case mine == name:
+			text = deleteKey(text, service, "style")
+		default:
+			text = setKey(text, service, "style", strconv.Quote(name))
+		}
+	}
+	return text
+}
+
+// deleteKey removes the key's line from [section] of the TOML text, if it is there.
+func deleteKey(text, section, key string) string {
+	lines := strings.Split(text, "\n")
+	inside := multiline(lines)
+	in := false
+	for i, line := range lines {
+		if inside[i] {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "[") {
+			name, _, _ := strings.Cut(trimmed, "#")
+			in = strings.TrimSpace(name) == "["+section+"]"
+			continue
+		}
+		if k, _, ok := strings.Cut(line, "="); in && ok && strings.TrimSpace(k) == key {
+			return strings.Join(slices.Delete(lines, i, i+1), "\n")
+		}
+	}
+	return text
 }
 
 // setKey sets key = literal in [section] of the TOML text: in place when the key is there, else right under the

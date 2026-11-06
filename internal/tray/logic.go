@@ -257,8 +257,8 @@ func PillHint(phase, key string, held bool) []Segment {
 	return []Segment{{"Release ", false}, {key, true}, {" to stop · ", false}, {"Esc", true}, {" discard", false}}
 }
 
-// MenuChoices are the menu's radio lists, keyed by their config.SaveChoice name: only what dictation uses. The
-// transform presets come after "none" in file order. stt and llm always get a <service>_provider list, even of one,
+// MenuChoices are the menu's radio lists, keyed by their config.SaveChoice name: what dictation uses, plus the voice
+// style when the tts provider applies styles. Transforms and styles come after "None" in file order. stt and llm always get a <service>_provider list, even of one,
 // so the menu shows which provider is in use.
 func MenuChoices(c *config.Config) map[string][]Choice {
 	choices := map[string][]Choice{}
@@ -268,6 +268,13 @@ func MenuChoices(c *config.Config) map[string][]Choice {
 			transform = append(transform, Choice{presetLabel(name), name, name == c.STT.Transform})
 		}
 		choices["transform"] = transform
+	}
+	if c.TTS != nil && c.TTS.InstructionsMode != "" && len(c.StyleOrder) > 0 {
+		style := []Choice{{"None: plain voice", "", c.TTS.Style == ""}}
+		for _, name := range c.StyleOrder {
+			style = append(style, Choice{presetLabel(name), name, name == c.TTS.Style})
+		}
+		choices["voice_style"] = style
 	}
 	for _, service := range []string{"stt", "llm"} {
 		p := c.Providers[service]

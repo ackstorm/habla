@@ -137,10 +137,13 @@ an inactive entry reading `$ELEVENLABS_API_KEY`). It takes no `instructions_mode
 rejected in `stt` and `llm`. A `voices` list may use `"Name=ID"` entries: `voice` can be the name or the ID, and the
 request carries the ID.
 
-**Tray choices** (only what dictation uses: *Transform*, *STT provider* and *LLM provider*, which show the active
-provider even when it is the only one, *Also paste automatically*, *And press Enter*) are written into
-`config.toml`, keeping its other lines and comments; *None* writes `transform = ""`. The tray reloads the file whenever
-it is saved, so *Edit config…* applies at once (except `hotkey`, which needs a tray restart).
+**Tray choices** (*Transform*, *Voice style*, *STT provider* and *LLM provider*, which show the active provider even
+when it is the only one, *Also paste automatically*, *And press Enter*) are written into `config.toml`, keeping its
+other lines and comments; *None* writes `transform = ""`. *Voice style* lists the `[styles.*]` when the tts provider
+has `instructions_mode`: it writes `style` into `[tts]` and `[live]`, which overrides the provider's own, and removes
+it again where the pick matches the provider's style. The tray reloads the file whenever it is saved, so *Edit
+config…* applies at once, except `hotkey` and the inbox key: *Reload* restarts the tray in place for those (and runs
+a newly installed binary). *View logs…* opens `habla.log`.
 
 **Upload interval:** `[general] upload_interval_ms` sets how often audio is sent while recording: 50 ms by default,
 50–1000 ms. Stopping flushes the rest at once.

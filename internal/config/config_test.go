@@ -681,3 +681,81 @@ func TestInboxConfiguration(t *testing.T) {
 		})
 	}
 }
+
+const voiceStyles = `[tts]
+provider = "g"
+
+[tts.providers.g]
+api = "gemini"
+endpoint = "https://g/v1beta"
+api_key = "env:G"
+model = "m"
+voice = "Kore"
+instructions_mode = "inline"
+style = "sevilla"
+
+[live]
+provider = "r"
+
+[live.providers.r]
+endpoint = "wss://r/v1/realtime"
+api_key = "env:R"
+model = "m"
+instructions_mode = "inline"
+style = "sevilla"
+
+[styles.sevilla]
+instructions = "Acento sevillano."
+
+[styles.vasco]
+instructions = """
+Acento vasco.
+"""
+`
+
+func TestServiceStyleOverridesTheProvider(t *testing.T) {
+	c, err := parse(strings.Replace(voiceStyles, `provider = "g"`, "provider = \"g\"\nstyle = \"vasco\"", 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.TTS.Style != "vasco" || c.TTS.Instructions != "Acento vasco." || c.Live.Style != "sevilla" {
+		t.Fatalf("tts %q %q, live %q", c.TTS.Style, c.TTS.Instructions, c.Live.Style)
+	}
+	if c, err := parse(strings.Replace(voiceStyles, `provider = "r"`, "provider = \"r\"\nstyle = \"\"", 1)); err != nil || c.Live.Style != "" || c.Live.Instructions != "" {
+		t.Fatalf("an empty override keeps a style: %v %+v", err, c)
+	}
+	if _, err := parse(strings.Replace(voiceStyles, `provider = "g"`, "provider = \"g\"\nstyle = \"nope\"", 1)); err == nil || !strings.HasPrefix(err.Error(), "tts.style: expected a name in [styles.*]") {
+		t.Fatalf("unknown override: %v", err)
+	}
+	if _, err := parse("[llm]\nstyle = \"x\"\n"); err == nil || !strings.HasPrefix(err.Error(), "unknown key llm.style") {
+		t.Fatalf("llm takes no style: %v", err)
+	}
+}
+
+func TestSaveChoiceVoiceStyleOverridesOnlyWhenItDiffers(t *testing.T) {
+	setup(t)
+	write(t, Path(), voiceStyles)
+	if err := SaveChoice("voice_style", "vasco"); err != nil {
+		t.Fatal(err)
+	}
+	c := mustLoad(t)
+	if c.TTS.Style != "vasco" || c.Live.Style != "vasco" || c.file.TTS.Providers["g"].Style != "sevilla" {
+		t.Fatalf("tts %q live %q", c.TTS.Style, c.Live.Style)
+	}
+	data, _ := os.ReadFile(Path())
+	if !strings.Contains(string(data), "[tts]\nstyle = \"vasco\"\nprovider") || !strings.Contains(string(data), "[live]\nstyle = \"vasco\"\nprovider") {
+		t.Fatalf("config.toml:\n%s", data)
+	}
+	if err := SaveChoice("voice_style", ""); err != nil {
+		t.Fatal(err)
+	}
+	if c := mustLoad(t); c.TTS.Style != "" || c.Live.Style != "" {
+		t.Fatalf("no style: tts %q live %q", c.TTS.Style, c.Live.Style)
+	}
+	if err := SaveChoice("voice_style", "sevilla"); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(Path()); string(data) != voiceStyles {
+		t.Fatalf("the provider's own style left an override:\n%s", data)
+	}
+}
