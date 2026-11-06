@@ -182,8 +182,9 @@ voices      = ["George=JBFqnCBsd6RMkjVDRZzb", "Alice=Xb7hH8MSUJpSbSDYk0k2"]
 ```
 
 Each `[styles.<name>]` has a nonempty `instructions` (may span lines) and is shared by tts and live providers.
-A provider's `style` absent or `""` means no style, including when a style named `default` is defined. A selected
-name must exist. No `instructions_mode` means no instructions are applied; a selected inactive style produces a
+A provider's `style` absent or `""` means no style, including when a style named `default` is defined. A `style` in
+`[tts]` or `[live]` itself (even `""`) overrides the active provider's; the tray's *Voice style* menu writes it to both
+and removes it where it matches the provider's own. A selected name must exist. No `instructions_mode` means no instructions are applied; a selected inactive style produces a
 warning. Merely defining an unselected style does not produce a warning in the current implementation.
 `habla say` and `habla live` take `--style NAME` to use another style for one run without writing the file;
 `--style ""` means no style, as `style = ""` does.
