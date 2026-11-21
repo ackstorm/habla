@@ -5,6 +5,11 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+### Fixed
+
+- `habla inbox` holds a message while you dictate and speaks it once the recording ends, so it no longer interrupts
+  the dictation or lands in the mic.
+
 ## [0.1.20] - 2026-11-06
 
 ### Added

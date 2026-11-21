@@ -5,12 +5,17 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"slices"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/ackstorm/habla/internal/config"
+	"github.com/ackstorm/habla/internal/rundir"
+	"github.com/ackstorm/habla/internal/testenv"
 )
 
 // fakeServer is an Artifact Server's agent and voice routes: polls answer from replies in order, then 204.
@@ -131,5 +136,27 @@ func TestRunStopsWhenTheKeyIsRefused(t *testing.T) {
 	defer cancel()
 	if err := Run(ctx, &config.Inbox{Server: srv.URL}, "bad"); err != errRefused {
 		t.Fatalf("got %v, want errRefused", err)
+	}
+}
+
+// TestMessagesWaitWhileRecording: a message waits while a dictation records and plays once it is processing.
+func TestMessagesWaitWhileRecording(t *testing.T) {
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	holder := testenv.HablaProcess(t)
+	os.WriteFile(filepath.Join(rundir.Dir(), rundir.Listen), []byte(strconv.Itoa(holder.Process.Pid)+"\n"), 0o600)
+	rundir.WriteState("recording")
+
+	done := make(chan struct{})
+	go func() { waitForSilence(context.Background()); close(done) }()
+	select {
+	case <-done:
+		t.Fatal("the message did not wait for the recording")
+	case <-time.After(time.Second):
+	}
+	rundir.WriteState("busy")
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the message still waits after the recording ended")
 	}
 }

@@ -35,7 +35,7 @@ Push-to-dictate for the Linux desktop through OpenAI-compatible, Gemini or Eleve
 - `internal/inbox`: `habla inbox`. Registers on `[inbox] server` (`POST /api/v1/agents`, kind `habla`, connectionKey =
   sha256(hostname + "\x00habla-inbox")) with a member key holding `agent:connect`, then long-polls
   `POST /api/v1/agents/:id/voice?wait=25` (its heartbeat: `voice_say` queues only while it is connected) and speaks each
-  message in order, after waiting up to 30 s while `say.pid` is held. 401 stops it; 403/404 register again; disconnect
+  message in order, after waiting up to 30 s while `say.pid` is held and for as long as the state is `recording`. 401 stops it; 403/404 register again; disconnect
   on exit. The tray runs it as a child while `[inbox] enabled` (`runInbox`).
 - `internal/say`: `habla say`. `config.TTS.Delivery` selects the style voice/instructions and warns if a style is inactive. One `gateway.Speak` request → `--out FILE`, or
   `say.wav` played by `pw-play`/`paplay` while holding `say.pid` (no `state`); SIGTERM (`--stop`) terminates the player, exit 0.
