@@ -5,6 +5,8 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 
 ## [Unreleased]
 
+## [0.1.21] - 2026-11-21
+
 ### Fixed
 
 - `habla inbox` holds a message while you dictate and speaks it once the recording ends, so it no longer interrupts
@@ -212,7 +214,8 @@ follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor version m
 - `habla` skill for Claude Code and Codex: configuration and spoken replies via `habla say`.
 - One static binary (amd64, arm64) installed by `install.sh` with checksum verification and tray autostart.
 
-[Unreleased]: https://github.com/ackstorm/habla/compare/v0.1.20...HEAD
+[Unreleased]: https://github.com/ackstorm/habla/compare/v0.1.21...HEAD
+[0.1.21]: https://github.com/ackstorm/habla/compare/v0.1.20...v0.1.21
 [0.1.20]: https://github.com/ackstorm/habla/compare/v0.1.19...v0.1.20
 [0.1.19]: https://github.com/ackstorm/habla/compare/v0.1.18...v0.1.19
 [0.1.18]: https://github.com/ackstorm/habla/compare/v0.1.17...v0.1.18
