@@ -190,9 +190,10 @@ func (c *client) disconnect() {
 	c.do(ctx, http.MethodPost, c.in.Server+"/api/v1/agents/"+url.PathEscape(c.agent)+"/disconnect", nil, nil)
 }
 
-// waitForSilence waits up to 30 s while another habla say plays, so messages never cut each other.
+// waitForSilence waits up to 30 s while another habla say plays, so messages never cut each other, and for as long
+// as a dictation is recording (max_seconds bounds it), so a message never interrupts it or lands in the mic.
 func waitForSilence(ctx context.Context) {
-	for i := 0; i < 60 && rundir.RunningPID(rundir.Say) != 0 && ctx.Err() == nil; i++ {
+	for i := 0; ctx.Err() == nil && (rundir.ReadState() == "recording" || i < 60 && rundir.RunningPID(rundir.Say) != 0); i++ {
 		select {
 		case <-ctx.Done():
 		case <-time.After(500 * time.Millisecond):
